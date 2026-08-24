@@ -9,14 +9,15 @@ use aliased 'Aion::Aya::Query::Order';
 
 use Aion -role;
 
-my @export = qw/box_for F NOT EXIST COUNT SUM AVG CAST DESC ASC/;
+my @export = qw/box_for F EXIST COUNT MIN MAX SUM AVG CAST DESC ASC/;
 
 sub import {
 	my (undef, @attrs) = @_;
 	my $pkg = caller;
 
 	local $" = " ";
-	eval "use Aion qw/@attrs/; with qw/Aion::Aya::Box/; 1" or die;
+	my $attrs = @attrs? " qw{@attrs}": "";
+	eval "use Aion$attrs; with qw/Aion::Aya::Box/; 1" or die;
 	
 	*{"$pkg\::$_"} = \&$_ for @export;
 }
@@ -26,7 +27,8 @@ sub unimport {
 	my $pkg = caller;
 
    	local $" = " ";
-	eval "no Aion qw/@attrs/; 1" or die;
+    my $attrs = @attrs? " qw{@attrs}": "";
+	eval "no Aion$attrs; 1" or die;
 	
 	undef &{"$pkg\::$_"} for @export;
 }
@@ -46,7 +48,7 @@ has _appearance => (is => 'ro', isa => 'Aion::Aya::Appearance', eon => 1);
 sub query_builder {
 	my ($self) = @_;
 	
-	QueryBuilder->new(box_for => $self->box_for, appearance => $self->_appearance);
+	QueryBuilder->new(_from => $self->box_for, _appearance => $self->_appearance);
 }
 
 sub F($) {
@@ -59,57 +61,51 @@ sub V($) {
 	Val->new(value => $scalar);
 }
 
-sub desc($) {
-	my ($op) = @_;
-	Order->new(op => $op, desc => 1);
+my $desc;
+sub DESC() {
+	$desc //= Order->new(desc => 1);
 }
 
-sub asc($) {
-	my ($op) = @_;
-	Order->new(op => $op, desc => 0);
+my $asc;
+sub ASC() {
+	$asc //= Order->new(desc => 0);
 }
 
 #@category Функции и унарные операторы
 
-#sub EXISTS {
-#	my ($self) = @_;
-#	Fn->new(name => 'count', args => [$op]);
-#}
+sub EXISTS {
+	my ($self) = @_;
+	Fn->new(name => 'exists', args => [$op]);
+}
 
-#sub count {
-#	my ($arg) = @_;
-#	Fn->new(name => 'count', args => [$arg]);
-#}
+sub COUNT {
+	my ($arg) = @_;
+	Fn->new(name => 'count', args => [$arg]);
+}
 
-#sub SUM {
-#	my ($self) = @_;
-	
-#	$self
-#}
+sub MIN {
+	my ($arg) = @_;
+	Fn->new(name => 'min', args => [$arg]);
+}
 
-#sub AVG {
-#	my ($self, ) = @_;
-#	Fn->new(name => 'avg', args => []);
-#}
+sub MAX {
+	my ($arg) = @_;
+	Fn->new(name => 'max', args => [$arg]);
+}
 
-#sub CAST {
-#	my ($self, ) = @_;
-#	Fn->new(name => 'avg', args => );
-#}
+sub SUM {
+	my ($self, $exp) = @_;
+	Fn->new(name => 'sum', args => [$exp]);
+}
 
-#sub F($) {
-#	my ($field) = @_;
-#	Field->new(name => $field);
-#}
+sub AVG {
+	my ($self, $exp) = @_;
+	Fn->new(name => 'avg', args => [$exp]);
+}
 
-#sub DESC($) {
-#	my ($op) = @_;
-#	Order->new(desc => 1, operand => $op);
-#}
-
-#sub ASC($) {
-#	my ($op) = @_;
-#	Order->new(operand => $op);
-#}
+sub CAST {
+	my ($self, $exp, $type) = @_;
+	Fn->new(name => 'cast', args => [$exp, $type]);
+}
 
 1;

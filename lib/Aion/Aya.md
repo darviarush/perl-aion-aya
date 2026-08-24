@@ -10,7 +10,7 @@ Aion::Aya - ORM
 
 Файл .env:
 ```text
-AION_AYA_CLIENT = Aion::Aya::Client::Memory
+AION_AYA_ADAPTER = Aion::Aya::Adapter::Memory
 ```
 
 Файл lib/Liberia/Storage/Author/Author.pm:

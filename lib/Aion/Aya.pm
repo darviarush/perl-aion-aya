@@ -8,7 +8,7 @@ use Aion::Aya::Model;
 
 use Aion -role;
 
-# Информация о таблице
+# Информация о таблицах
 our %META;
 
 # Импорт функций в модуль
@@ -17,7 +17,8 @@ sub import {
 	my $pkg = caller;
 
 	local $" = " ";
-	eval "use Aion qw/@attrs/; with qw/Aion::Aya/; 1" or die;
+	my $attrs = @attrs? " qw{@attrs}": "";
+	eval "use Aion$attrs; with qw/Aion::Aya/; 1" or die;
 	
 	*{"$pkg\::$_"} = \&$_ for qw/presents primary_key unique_key index_key foreign_key memory_key fetch_key/;
 }
@@ -27,7 +28,8 @@ sub unimport {
 	my $pkg = caller;
 
    	local $" = " ";
-	eval "no Aion qw/@attrs/; 1" or die;
+    my $attrs = @attrs? " qw{@attrs}": "";
+	eval "no Aion$attrs; 1" or die;
 	
 	undef &{"$pkg\::$_"} for qw/box_for/;
 }
@@ -47,51 +49,52 @@ sub presents(@) {
 
 #@category Ключи
 
-my $meta_inject = sub {
-	my ($key_name, $fields, $key) = @_;
-	my $meta = $META{caller(1)} //= {};
-	push @{$meta->{$key_name}}, $key;
-	push @{$meta->{field}{$_}}, $key for @$fields;
-	return;
-};
-
 # Если ключ - составной
 sub primary_key(@) {
 	my ($name, $fields, @options) = @_;
 	my $meta = $META{caller()};
 	die "Primary key is already installed!" if exists $meta->{primary_key};
-    my $key = $meta->{primary_key} = {fields => $fields, options => \@options};
-    push @{$meta->{field}{$_}}, $key for @$fields;
+    $meta->primary_key({name => 'PRIMARY', fields => $fields, options => \@options});
 	return;
 }
 
 # Если ключ - составной
 sub unique_key(@) {
 	my ($name, $fields, @options) = @_;
-    $meta_inject->(unique_keys => $fields, {name => $name, fields => $fields, options => \@options});
+	my $meta = $META{caller()};
+	my $key = {name => $name, fields => $fields, options => \@options};
+	Aion::Aya::Model->Key->validate($key, "unique_key $name");
+	push @{$meta->{unique_keys}}, $key;
 }
 
 # Если ключ - составной
 sub index_key(@) {
 	my ($name, $fields, @options) = @_;
-	$meta_inject->(index_keys => $fields, {name => $name, fields => $fields, options => \@options});
+	my $meta = $META{caller()};
+	my $key = {name => $name, fields => $fields, options => \@options};
+	Aion::Aya::Model->Key->validate($key, "index_key $name");
+	push @{$meta->{unique_keys}}, $key;
 }
 
 # Если ключ - составной
 sub foreign_key(@) {
-	my ($name_format, $to_class, $field_aref, @options) = @_;	
-	my @fields = List::Util::pairmap { $a } @$field_aref;
-	$meta_inject->(foreign_keys => \@fields, {name_format => $name_format, to_class => $to_class, field_aref => $field_aref, options => \@options});
+	my ($name, $to_class, $fields, $to_fields, @options) = @_;
+	my $meta = $META{caller()};
+	my $key = {name => $name, to_class => $to_class, fields => $fields, to_fields => $to_fields, options => \@options};
+	Aion::Aya::Model->ForeignKey->validate($key, "foreign_key $name");
+	push @{$meta->{foreign_keys}}, $key;
 }
 
 # Часть строки с указанными полями будет хранится в таком ключе.
 # Укажите в имени методы в фигурных скобках по которым название ключа для кеша будет сформировано. Например: "{*}-{id}", где {*} - название таблицы, а {id} - значение идентификатора.
 # Экранируйте обратным слешем фигурные скобки, если они нужны в названии ключа.
 # Когда запрашивается поле из entity и его там нет, то оно подгружается из кеша по ключу в который входит. Заодно подгружаются и все другие поля в этом ключе.
-# Если же поле не входит ни в один memory_key или storage_key, то оно будет загружатся из базы в гордом одиночестве, что может понадобится для блобов и других объёмных полей
+# Если же поле не входит ни в один memory_key или fetch_key, то оно будет загружатся из базы в гордом одиночестве, что может понадобится для блобов и других объёмных полей
 sub memory_key(@) {
-	my ($name, $fields, @options) = @_;
-	$meta_inject->(memory_keys => $fields, {name => $name, fields => $fields, options => \@options});
+	my ($name_format, $fields, @options) = @_;
+	my $key = {name => $name_format, fields => $fields, options => \@options};
+	Aion::Aya::Model->Key->validate($key, "memory_key $name");
+	$meta->{memory_key}{$_} = $key for @$fields;
 }
 
 # Когда поле будет запрошено из Entity, то оно загрузится вместе с другими полями в ключе, если эти поля отсутствуют в объекте
@@ -105,11 +108,7 @@ sub fetch_key(@) {
 # Объявляет первичный ключ таблицы
 aspect pk => sub {
 	my ($value, $feature) = @_;
-
-	my ($cls, $name) = @$feature{qw/cls name/};
-
-	die "Primary key is already installed!" if exists $META{$cls}{primary_key};
-	$META{$cls}{primary_key} = {fields => [$name]};
+	primary_key([$feature->name]);
 };
 
 # Определяет генератор для создания идентификаторов

@@ -3,12 +3,16 @@ package Aion::Aya::Adapter;
 
 use common::sense;
 
+use aliased 'Aion::Aya::Query';
+use aliased 'Aion::Aya::Iterator';
+
 use Aion -role;
 
+# Трансформирует запрос в промежуточное представление (например, SQL или структуру у Elastic)
+sub transform :Isa(Me => Object[Query] => (ArrayRef|HashRef|Str));
 
-# Трансформирует запрос в промежуточное представление
-sub transform :Isa(Me => Query => (ArrayRef|HashRef|Str));
+sub iter :Isa(Me => Object[Iterator]);
 
-
+sub next :Isa(Me => Any => Any);
 
 1;

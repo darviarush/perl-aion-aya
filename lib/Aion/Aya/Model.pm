@@ -12,8 +12,22 @@ use constant {
 
 BEGIN {
 	subtype 'Key', as Dict[
-		name => Option[Str],
+		name => Str,
 		fields => ArrayRef[Str],
+		options => ArrayRef[Str],
+	];
+
+	subtype 'ForeignKey', as Dict[
+		name => Str,
+		to_class => ClassName,
+		fields => ArrayRef[Str],
+		to_fields => ArrayRef[Str],
+		options => ArrayRef[Str],
+	];
+
+	subtype 'Column', as Dict[
+		name => Str,
+		
 	];
 }
 
@@ -32,7 +46,20 @@ has primary_key => (is => 'ro', isa => Key);
 # Уникальные ключи
 has unique_keys => (is => 'ro', isa => ArrayRef[Key], lazy => 0, default => sub {+[]});
 
-our %COLUMN;
+# Индексы
+has index_keys => (is => 'ro', isa => ArrayRef[Key], lazy => 0, default => sub {+[]});
+
+# Внешние ключи
+has foreign_keys => (is => 'ro', isa => ArrayRef[ForeignKey], lazy => 0, default => sub {+[]});
+
+# Индексы в кеше
+has memory_key => (is => 'ro', isa => HashRef[Key], lazy => 0, default => sub {+[]});
+
+# Индексы для загрузки нескольких полей из базы, если затронут только один
+has fetch_key => (is => 'ro', isa => HashRef[Key], lazy => 0, default => sub {+[]});
+
+# 
+has column => (is => 'ro', isa => HashRef[Column]);
 
 # Возвращает имя столбца по полю
 sub col_name {
