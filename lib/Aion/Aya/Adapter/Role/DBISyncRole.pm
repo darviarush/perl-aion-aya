@@ -8,7 +8,7 @@ use Aion -role;
 sub iterator :Isa(Me => Object[Iterator]) {
 	my ($self) = @_;
 	my $dbh = ;
-	Iterator->new(adapter => $self, session => 0);
+	Iterator->new(adapter => $self, session => $dbh);
 }
 
 # Следующее значение из сессии

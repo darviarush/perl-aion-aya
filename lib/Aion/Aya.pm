@@ -93,14 +93,23 @@ sub foreign_key(@) {
 sub memory_key(@) {
 	my ($name_format, $fields, @options) = @_;
 	my $key = {name => $name_format, fields => $fields, options => \@options};
-	Aion::Aya::Model->Key->validate($key, "memory_key $name");
-	$meta->{memory_key}{$_} = $key for @$fields;
+	Aion::Aya::Model->Key->validate($key, "memory_key $name_format");
+	for my $field (@$fields) {
+		die "$name_format and $meta->{memory_key}{$_}{name} memory_keys use one field $field!" if exists $meta->{memory_key}{$_};
+		$meta->{memory_key}{$_} = $key;
+	}
 }
 
 # Когда поле будет запрошено из Entity, то оно загрузится вместе с другими полями в ключе, если эти поля отсутствуют в объекте
 sub fetch_key(@) {
 	my ($fields, @options) = @_;
-	$meta_inject->(fetch_keys => $fields, {fields => $fields, options => \@options});
+	my $name = join "-", @$fields;
+	my $key = {name => $name, fields => $fields, options => \@options};
+	Aion::Aya::Model->Key->validate($key, "fetch_key $name");
+	for my $field (@$fields) {
+		die "$name and $meta->{memory_key}{$_}{name} fetch_keys use one field $field!" if exists $meta->{memory_key}{$_};
+		$meta->{memory_key}{$_} = $key;
+	}
 }
 
 #@category Аспекты

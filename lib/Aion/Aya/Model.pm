@@ -19,15 +19,10 @@ BEGIN {
 
 	subtype 'ForeignKey', as Dict[
 		name => Str,
-		to_class => ClassName,
+		to_class => PackageName,
 		fields => ArrayRef[Str],
 		to_fields => ArrayRef[Str],
 		options => ArrayRef[Str],
-	];
-
-	subtype 'Column', as Dict[
-		name => Str,
-		
 	];
 }
 
@@ -52,22 +47,17 @@ has index_keys => (is => 'ro', isa => ArrayRef[Key], lazy => 0, default => sub {
 # Внешние ключи
 has foreign_keys => (is => 'ro', isa => ArrayRef[ForeignKey], lazy => 0, default => sub {+[]});
 
-# Индексы в кеше
+# Индексы в кеше: field => Key
 has memory_key => (is => 'ro', isa => HashRef[Key], lazy => 0, default => sub {+[]});
 
 # Индексы для загрузки нескольких полей из базы, если затронут только один
 has fetch_key => (is => 'ro', isa => HashRef[Key], lazy => 0, default => sub {+[]});
 
-# 
-has column => (is => 'ro', isa => HashRef[Column]);
-
 # Возвращает имя столбца по полю
 sub col_name {
 	my ($self, $field) = @_;
-
-	return $COLUMN{$field}{name} if exists $COLUMN{$field}{name};
 	
-	my $feature = $Aion::META{$self->{pkg}}{feature}{$field};
+	my $feature = $Aion::META{$self->{pkg}}{feature}{$field} or die "Not $field!";
 	my $name = $feature->{name};
 	
 	if(my $col = $feature->{opt}{col}) {
