@@ -8,11 +8,18 @@ use aliased 'Aion::Aya::Iterator';
 
 use Aion -role;
 
+req dsn => (is => 'ro', isa => Str);
+req login => (is => 'ro', isa => Maybe[Str]);
+req password => (is => 'ro', isa => Maybe[Str]);
+req attr => (is => 'ro', isa => HashRef);
+
 # Трансформирует запрос в промежуточное представление (например, SQL или структуру у Elastic)
 sub transform :Isa(Me => Object[Query] => (ArrayRef|HashRef|Str));
 
-sub iter :Isa(Me => Object[Iterator]);
+# Порождает итератор
+sub iterator :Isa(Me => Object[Query] => Object[Iterator]);
 
-sub next :Isa(Me => Any => Any);
+# Следующее значение из сессии (второй параметр) или undef
+sub next :Isa(Me => Hashref => Any);
 
 1;

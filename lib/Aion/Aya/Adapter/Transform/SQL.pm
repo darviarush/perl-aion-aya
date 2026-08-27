@@ -1,4 +1,4 @@
-package Aion::Aya::Adapter::Role::SQLRole;
+package Aion::Aya::Adapter::Transform::SQL;
 
 use common::sense;
 

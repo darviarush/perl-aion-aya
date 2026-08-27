@@ -53,7 +53,7 @@ sub query_builder {
 
 sub F($) {
 	my ($name) = @_;
-	Field->new(name => $name);
+	Field->new(name => $name, from => caller()->box_for);
 }
 
 sub V($) {

@@ -34,7 +34,7 @@ has _aliases => (is => 'ro-', isa => HashRef[Str], default => sub {
 });
 
 # Запрос
-has _query => (is => 'ro-', isa => Query, lazy => 0, defalt => sub { Query->new });
+has _query => (is => 'ro-', isa => Query, lazy => 0, defalt => sub { Query->new(from => $self->_from) });
 
 #@category Описатели
 
@@ -50,7 +50,9 @@ sub left_join {
 
 sub annotate {
 	my ($self, @select) = @_;
-	$self->_query->clone(select => \@select);
+	$self->_query->clone(select => [
+		map { UNIVERSAL::isa($_, Expr)? $_: Field->new(name => $_, from => $self->_from); } @select
+	]);
 }
 
 sub add_annotate {
@@ -129,7 +131,7 @@ sub limit {
 sub iter {
 	my ($self) = @_;
 	
-	Iterator->new(adapter => $self->adapter);
+	$self->adapter->iterator;
 }
 
 sub iter_or_array {

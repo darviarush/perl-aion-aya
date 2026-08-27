@@ -92,6 +92,7 @@ sub foreign_key(@) {
 # Если же поле не входит ни в один memory_key или fetch_key, то оно будет загружатся из базы в гордом одиночестве, что может понадобится для блобов и других объёмных полей
 sub memory_key(@) {
 	my ($name_format, $fields, @options) = @_;
+	my $meta = $META{caller()};
 	my $key = {name => $name_format, fields => $fields, options => \@options};
 	Aion::Aya::Model->Key->validate($key, "memory_key $name_format");
 	for my $field (@$fields) {
@@ -103,12 +104,13 @@ sub memory_key(@) {
 # Когда поле будет запрошено из Entity, то оно загрузится вместе с другими полями в ключе, если эти поля отсутствуют в объекте
 sub fetch_key(@) {
 	my ($fields, @options) = @_;
+	my $meta = $META{caller()};
 	my $name = join "-", @$fields;
 	my $key = {name => $name, fields => $fields, options => \@options};
 	Aion::Aya::Model->Key->validate($key, "fetch_key $name");
 	for my $field (@$fields) {
-		die "$name and $meta->{memory_key}{$_}{name} fetch_keys use one field $field!" if exists $meta->{memory_key}{$_};
-		$meta->{memory_key}{$_} = $key;
+		die "$name and $meta->{fetch_key}{$_}{name} fetch_keys use one field $field!" if exists $meta->{fetch_key}{$_};
+		$meta->{fetch_key}{$_} = $key;
 	}
 }
 
@@ -124,16 +126,16 @@ aspect pk => sub {
 aspect next => sub {
 	my ($value, $feature) = @_;
 	my $cls = $feature->{cls};
-	$META{$cls}{next} = $value;
+	$META{$cls}->next($value);
 };
 
 my $make_column_feature = sub {
 	my ($feature) = @_;
 	my $name = $feature->{name};
 	$feature->construct
-		->add_access("\$self->_appearance->columns->fetch('$name') unless exists \$self->{$name};")
-		->add_trigger("\$self->_appearance->columns->store('$name')")
-		->add_cleaner("\$self->_appearance->columns->clear('$name')")
+		->add_access("\$self->_appearance->fetch(\$self, '$name') unless exists \$self->{$name};")
+		->add_trigger("\$self->_appearance->store(\$self, '$name')")
+		->add_cleaner("\$self->_appearance->clear(\$self, '$name')")
 	;
 };
 
