@@ -33,4 +33,5 @@ on 'test' => sub {
 };
 
 requires 'Aion';
+requires 'CHI';
 requires 'common::sense';

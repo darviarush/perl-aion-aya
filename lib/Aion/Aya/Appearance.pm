@@ -8,6 +8,7 @@ use Scalar::Util qw//;
 use aliased 'Aion::Aya::Adapter';
 use aliased 'Aion::Aya::Model';
 use aliased 'Aion::Aya::QueryBuilder';
+use aliased 'Aion::Aya::Transaction';
 
 use Aion;
 
@@ -25,17 +26,31 @@ use Aion::Env::Etc ADAPTER => (
 	key => 'aion.aya.adapter'
 );
 
+use Aion::Env::Etc CACHE => (
+	isa => HashRef,
+	default => {},
+	key => 'aion.aya.cache'
+);
+
 use constant ERROR_FETCH_PKEY => "No primary key";
 use constant FS => "\f";
 
 # Адаптер для доступа к базе
-has adapter => (is => 'ro', isa => Adapter, default => sub {
+has _adapter => (is => 'ro', isa => Adapter, default => sub {
 	my ($self) = @_;
 	my $config = ADAPTER->{default} or die "aion.aya.adapter.default does not exist!";
 	my %config = %$config;
 	my $adapter_class = delete $config{adapter};
 	eval "require $adapter_class" or die;
 	$adapter_class->new(%config);
+});
+
+# Кеш
+has _cache => (is => 'ro', isa => Maybe['CHI'], default => sub {
+	my ($self) = @_;
+	my $config = CACHE->{default} // return undef;
+	require CHI;
+	CHI->new(%$config);
 });
 
 # Область отслеживания объектов / Identity Map (Карта идентичности)
@@ -118,22 +133,53 @@ sub remove {
 sub fetch {
 	my ($self, $object, $field) = @_;
 
-	my $query = QueryBuilder->new(_appearance => $self, _from => ref $object);
-
 	my $model = Model->get($object);
-	my $pk_fields = $model->primary_key->{fields};
-	$query = $query->filter(map {($_ => $object->{$_})} @$pk_fields);
 
+	# Поле входит в memory_key: достаём всю строку этого ключа из кеша
+	if ($self->_cache && (my $memory_key = $model->memory_key->{$field})) {
+		my $cache_key = $self->_cache_key($memory_key, $model, $object);
+
+		# Если ключа ещё нет в кеше — подгружаем поля ключа из базы и кладём туда
+		my $value = $self->_cache->compute($cache_key, undef, sub {
+			my $query = QueryBuilder->new(_appearance => $self, _from => ref $object);
+			$query = $query->filter(map {($_ => $object->{$_})} @{$model->primary_key->{fields}});
+			my $obj = $query->annotate(@{$memory_key->{fields}})->first // die "Not object by pk!";
+			+{ map { $_ => $obj->{$_} } @{$memory_key->{fields}} };
+		});
+
+		# Заполняем объект полями ключа, которых в нём ещё нет
+		for my $mfield (@{$memory_key->{fields}}) {
+			$object->{$mfield} = $value->{$mfield} unless exists $object->{$mfield};
+		}
+
+		return $self;
+	}
+
+	# fetch_key: подгружаем из базы поля ключа (или одно поле, если ключа нет)
 	my $fk_fields = $model->fetch_key->{$field}{fields};
 	$fk_fields = [$field] unless defined $fk_fields;
-	my @fk_fields = grep { !exists $object{$_} } @$fk_fields;
+	my @fk_fields = grep { !exists $object->{$_} } @$fk_fields;
 	return $self unless @fk_fields;
+	my $query = QueryBuilder->new(_appearance => $self, _from => ref $object);
+	$query = $query->filter(map {($_ => $object->{$_})} @{$model->primary_key->{fields}});
 	my $obj = $query->annotate(@fk_fields)->first // die "Not object by pk!";
 	for my $fk_field (@fk_fields) {
 		$object->{$fk_field} = $obj->{$fk_field};
 	}
 
 	$self
+}
+
+# Формирует ключ кеша по формату name из memory_key:
+# {*} — имя таблицы, {field} — значение поля объекта; экранированное \{field} остаётся как есть
+sub _cache_key {
+	my ($self, $key, $model, $object) = @_;
+
+	my $name = $key->{name};
+	$name =~ s/\\\{/\x00/g;
+	$name =~ s/\{([^}]*)\}/ $1 eq '*'? $model->table: $object->{$1} /ge;
+	$name =~ s/\x00/\{/g;
+	$name
 }
 
 # Возвращает ключ объекта в виде строки
@@ -158,7 +204,7 @@ sub flush {
 #   ...
 #   $transaction->commit;
 #
-# Если переменная уйдёт из области видимости без commit, то сработает
+# Если переменная уйдёт из области видимости без commit, то сработает rollback
 sub transaction {
 	my ($self) = @_;
 	
