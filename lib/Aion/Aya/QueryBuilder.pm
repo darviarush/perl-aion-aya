@@ -38,11 +38,13 @@ has _query => (is => 'ro-', isa => Query, lazy => 0, defalt => sub { Query->new(
 
 #@category Описатели
 
+# Присоединяет другую сущность внутренним (inner) объединением
 sub inner_join {
 	my ($self, $alias, $field) = @_;
 	$self->_query->clone(join => +{ @{$self->_query->join}, xJoin->new(field => $field, alias => $alias, join => 'inner') });
 }
 
+# Присоединяет другую сущность левым (left) объединением
 sub left_join {
 	my ($self, $alias, $field) = @_;
 	$self->_query->clone(join => +{ @{$self->_query->join}, xJoin->new(field => $field, alias => $alias, join => 'left') });
@@ -53,89 +55,100 @@ sub left_join {
 sub annotate {
 	my ($self, @select) = @_;
 
-	my %out;
+	my @out;
 	while (@select) {
 		my $item = shift @select;
 		if (UNIVERSAL::isa($item, Expr)) {
-			die "Expect a name after Expr!" unless @select;
 			my $name = shift @select;
 			die "Expect a Str name after Expr!" if UNIVERSAL::isa($name, Expr);
-			$out{$item} = $name;
+			push @out, $item, $name;
 		} else {
-			$out{ Field->new(alias => $self->_alias, name => $item, entity => $self->_from) } = $item;
+			push @out, Field->new(alias => $self->_alias, name => $item, entity => $self->_from), $item;
 		}
 	}
 
-	$self->_query->clone(select => \%out);
+	$self->_query->clone(select => \@out);
 }
 
+# Добавляет поля в выборку поверх уже отобранных
 sub add_annotate {
 	my ($self, @select) = @_;
-	$self->annotate(@select, );
-	$self->_query->clone(select => +{%{$self->select}, @select});
+	$self->annotate(@{$self->_query->select}, @select);
 }
 
+# Задаёт условие фильтрации
 sub filter {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
 	$self->_query->clone(filter => $op);
 }
 
+# Дополняет условие фильтрации логическим И (AND)
 sub and_filter {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
 	$self->_query->clone(filter => Op->new(left => $self->filter, op => 'AND', right => $op));
 }
 
+# Дополняет условие фильтрации логическим ИЛИ (OR)
 sub or_filter {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
 	$self->_query->clone(filter => Op->new(left => $self->filter, op => 'OR', right => $op));
 }
 
+# Задаёт группировку
 sub group_by {
 	my ($self, @groups) = @_;
 	$self->_query->clone(group_by => \@groups);
 }
 
+# Добавляет поля в группировку поверх уже заданных
 sub add_group_by {
 	my ($self, @groups) = @_;
 	$self->_query->clone(group_by => [@{$self->_group_by}, @groups]);
 }
 
+# Задаёт условие фильтрации после группировки (HAVING)
 sub having {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
 	$self->_query->clone(having => $op);
 }
 
+# Дополняет условие HAVING логическим И (AND)
 sub and_having {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
 	$self->_query->clone(having => Op->new(left => $self->having, op => 'AND', right => $op));
 }
 
+# Дополняет условие HAVING логическим ИЛИ (OR)
 sub or_having {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
 	$self->_query->clone(having => Op->new(left => $self->having, op => 'OR', right => $op));
 }
 
+# Задаёт сортировку
 sub order_by {
 	my ($self, @orders) = @_;
 	$self->_query->clone(order_by => \@orders);
 }
 
+# Добавляет сортировку поверх уже заданной
 sub add_order_by {
 	my ($self, @orders) = @_;
 	$self->_query->clone(order_by => [@{$self->order_by}, @orders]);
 }
 
+# Задаёт смещение выборки
 sub offset {
 	my ($self, $offset) = @_;
 	 $self->_query->clone(offset => $offset);
 }
 
+# Задаёт ограничение количества строк
 sub limit {
 	my ($self, $limit) = @_;
 	 $self->_query->clone(limit => $limit);
@@ -143,23 +156,27 @@ sub limit {
 
 #@category Получатели
 
+# Возвращает итератор по строкам выборки
 sub iter {
 	my ($self) = @_;
 	
 	$self->adapter->iterator;
 }
 
+# Возвращает массив в списковом контексте или итератор в скалярном
 sub iter_or_array {
 	my ($self) = @_;
 	wantarray? $self->as_array: $self->iter;
 }
 
+# Возвращает массив строк выборки
 sub as_array {
 	my ($self) = @_;
 	die "Not array context!" unless wantarray;
 	@{$self->iter};
 }
 
+# Возвращает единственную строку выборки (или умирает, если строк много)
 sub first {
 	my ($self) = @_;
 	my $iter = $self->iter;
@@ -168,12 +185,14 @@ sub first {
 	$first
 }
 
+# Возвращает значение поля единственной строки выборки
 sub scalar {
 	my ($self, $field) = @_;
 	$field =~ s/^-//;
 	$self->first->$field;
 }
 
+# Возвращает список значений поля всех строк выборки
 sub column {
 	my ($self, $field) = @_;
 	$field =~ s/^-//;
@@ -183,16 +202,19 @@ sub column {
 	wantarray? @column: \@column;
 }
 
+# Возвращает число строк в выборке
 sub count {
 	my ($self) = @_;
 	$self->annotate(Fn->new(name => 'count') => -count)->scalar(-count);
 }
 
+# Возвращает сумму значений по выборке
 sub sum {
 	my ($self) = @_;
 	$self->annotate(Fn->new(name => 'sum') => -sum)->scalar(-sum);
 }
 
+# Возвращает среднее арифметическое по выборке
 sub avg {
 	my ($self) = @_;
 	$self->annotate(Fn->new(name => 'avg') => -avg)->scalar(-avg);
@@ -209,7 +231,7 @@ sub _plain_op {
 		my $op = '=';
 		my $left = UNIVERSAL::isa($a, Expr)? $a: do {
 			my @chunks = split /__/, $a;
-			$op = pop @chunks if $chunks[$#chunks] ~~ qw/eq ne le ge gt lt like u`nlike isnull isnotnull/;
+			$op = pop @chunks if $chunks[$#chunks] ~~ qw/eq ne le ge gt lt like unlike isnull isnotnull/;
 			die "Not field `$a`" if @chunks < 1;
 			die "Many chunks `$a`" if @chunks > 2;
 			my ($alias, $entity, $name) = @chunks == 1

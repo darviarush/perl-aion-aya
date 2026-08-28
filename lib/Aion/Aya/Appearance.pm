@@ -152,7 +152,13 @@ sub flush {
 	...
 }
 
-# Объявляет транзакцию
+# Объявляет транзакцию: 
+#
+#   my $transaction = $appearance->transaction;
+#   ...
+#   $transaction->commit;
+#
+# Если переменная уйдёт из области видимости без commit, то сработает
 sub transaction {
 	my ($self) = @_;
 	
