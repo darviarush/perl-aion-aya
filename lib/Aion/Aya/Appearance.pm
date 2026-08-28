@@ -124,18 +124,13 @@ sub fetch {
 	my $pk_fields = $model->primary_key->{fields};
 	$query = $query->filter(map {($_ => $object->{$_})} @$pk_fields);
 
-	# fetch_key
 	my $fk_fields = $model->fetch_key->{$field}{fields};
-	if(defined $fetch_key) {
-		my @fk_fields = grep { !exists $object{$_} } @$fk_fields;
-		return $self unless @fk_fields;
-		my $obj = $query->annotate(@fk_fields)->first;
-		for my $fk_field (@fk_fields) {
-			$object->{$fk_field} = $obj{$fk_field};
-		}
-	}
-	else {
-		$self->{$field} = $query->scalar($field);
+	$fk_fields = [$field] unless defined $fk_fields;
+	my @fk_fields = grep { !exists $object{$_} } @$fk_fields;
+	return $self unless @fk_fields;
+	my $obj = $query->annotate(@fk_fields)->first // die "Not object by pk!";
+	for my $fk_field (@fk_fields) {
+		$object->{$fk_field} = $obj->{$fk_field};
 	}
 
 	$self

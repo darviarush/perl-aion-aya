@@ -48,15 +48,30 @@ sub left_join {
 	$self->_query->clone(join => +{ @{$self->_query->join}, xJoin->new(field => $field, alias => $alias, join => 'left') });
 }
 
+# Добавляет поля, которые или есть в объекте и их нужно подтянуть или которые будут добавлены в PROXY-объект.
+# Это или 'Expr' => Str (выражение, а за ним название поля) или Str – поле
 sub annotate {
 	my ($self, @select) = @_;
-	$self->_query->clone(select => [
-		map { UNIVERSAL::isa($_, Expr)? $_: Field->new(name => $_, from => $self->_from); } @select
-	]);
+
+	my %out;
+	while (@select) {
+		my $item = shift @select;
+		if (UNIVERSAL::isa($item, Expr)) {
+			die "Expect a name after Expr!" unless @select;
+			my $name = shift @select;
+			die "Expect a Str name after Expr!" if UNIVERSAL::isa($name, Expr);
+			$out{$item} = $name;
+		} else {
+			$out{ Field->new(alias => $self->_alias, name => $item, entity => $self->_from) } = $item;
+		}
+	}
+
+	$self->_query->clone(select => \%out);
 }
 
 sub add_annotate {
 	my ($self, @select) = @_;
+	$self->annotate(@select, );
 	$self->_query->clone(select => +{%{$self->select}, @select});
 }
 
