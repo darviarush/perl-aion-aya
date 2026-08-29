@@ -8,6 +8,7 @@ use aliased 'Aion::Aya::Query::Expr::Field';
 use aliased 'Aion::Aya::Query::Expr::Op';
 use aliased 'Aion::Aya::Query::Expr::UOp';
 use aliased 'Aion::Aya::Query::Expr::Val';
+use aliased 'Aion::Aya::Model';
 
 use Aion -role;
 
@@ -41,7 +42,7 @@ sub expr {
 	my ($self, $expr) = @_;
 	
 	if($expr->isa(Val)) { $expr->value }
-	elsif($expr->isa(Field)) { join '.', $self->word($expr->alias), $self->word($expr->name) }
+	elsif($expr->isa(Field)) { join '.', $self->word($expr->alias), $self->word(Model->get($expr->from)->col_name($expr->name)) }
 	elsif($expr->isa(UOp)) { join ' ', $expr->op, $self->expr($expr->exp) }
 	elsif($expr->isa(Op)) { join $expr->op, $self->expr($expr->left), $self->expr($expr->right) }
 	else { die "?" }

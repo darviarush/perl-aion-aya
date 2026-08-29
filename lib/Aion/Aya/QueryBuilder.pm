@@ -38,6 +38,24 @@ has _query => (is => 'ro-', isa => Query, lazy => 0, defalt => sub { Query->new(
 
 #@category Описатели
 
+# Переключение на операцию delete
+sub delete {
+	my ($self) = @_;
+	$self->_query->clone(operation => Query->DELETE);
+}
+
+# Переключение на операцию update, annotate превращается в секцию set 
+sub update {
+	my ($self, @update) = @_;
+	$self->_query->clone(operation => Query->UPDATE)->annotate(@update);
+}
+
+# Переключение на операцию insert, annotate превращается в секцию set 
+sub insert {
+	my ($self, @insert) = @_;
+	$self->_query->clone(operation => Query->INSERT)->annotate(@insert);
+}
+
 # Присоединяет другую сущность внутренним (inner) объединением
 sub inner_join {
 	my ($self, $alias, $field) = @_;

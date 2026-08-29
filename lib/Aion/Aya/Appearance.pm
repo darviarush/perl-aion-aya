@@ -26,12 +26,6 @@ use Aion::Env::Etc ADAPTER => (
 	key => 'aion.aya.adapter'
 );
 
-use Aion::Env::Etc CACHE => (
-	isa => HashRef,
-	default => {},
-	key => 'aion.aya.cache'
-);
-
 use constant ERROR_FETCH_PKEY => "No primary key";
 use constant FS => "\f";
 
@@ -46,12 +40,7 @@ has _adapter => (is => 'ro', isa => Adapter, default => sub {
 });
 
 # Кеш
-has _cache => (is => 'ro', isa => Maybe['CHI'], default => sub {
-	my ($self) = @_;
-	my $config = CACHE->{default} // return undef;
-	require CHI;
-	CHI->new(%$config);
-});
+has _cache => (is => 'ro', isa => 'CHI', eon => 1);
 
 # Область отслеживания объектов / Identity Map (Карта идентичности)
 has _area => (is => 'ro-', isa => HashRef['Aion::Aya'], lazy => 0, default => sub {+{}});
@@ -141,9 +130,7 @@ sub fetch {
 
 		# Если ключа ещё нет в кеше — подгружаем поля ключа из базы и кладём туда
 		my $value = $self->_cache->compute($cache_key, undef, sub {
-			my $query = QueryBuilder->new(_appearance => $self, _from => ref $object);
-			$query = $query->filter(map {($_ => $object->{$_})} @{$model->primary_key->{fields}});
-			my $obj = $query->annotate(@{$memory_key->{fields}})->first // die "Not object by pk!";
+			my $obj = $self->_fetch($object, @{$memory_key->{fields}});
 			+{ map { $_ => $obj->{$_} } @{$memory_key->{fields}} };
 		});
 
@@ -160,14 +147,22 @@ sub fetch {
 	$fk_fields = [$field] unless defined $fk_fields;
 	my @fk_fields = grep { !exists $object->{$_} } @$fk_fields;
 	return $self unless @fk_fields;
-	my $query = QueryBuilder->new(_appearance => $self, _from => ref $object);
-	$query = $query->filter(map {($_ => $object->{$_})} @{$model->primary_key->{fields}});
-	my $obj = $query->annotate(@fk_fields)->first // die "Not object by pk!";
+	my $obj = $self->_fetch($object, @fk_fields);
 	for my $fk_field (@fk_fields) {
 		$object->{$fk_field} = $obj->{$fk_field};
 	}
 
 	$self
+}
+
+# Подгружает из базы объект со всеми указанными @fields по первичному ключу
+sub _fetch {
+	my ($self, $object, @fields) = @_;
+
+	my $model = Model->get($object);
+	my $query = QueryBuilder->new(_appearance => $self, _from => ref $object);
+	$query = $query->filter(map {($_ => $object->{$_})} @{$model->primary_key->{fields}});
+	$query->annotate(@fields)->first // die "Not object by pk!";
 }
 
 # Формирует ключ кеша по формату name из memory_key:
