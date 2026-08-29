@@ -58,13 +58,11 @@ sub persist {
 	
 	for my $object (@_) {
 		my $key = $self->get_pkey($object);
-		unless(defined $key) {
-			my $model = Model->get($object);
-			$model->next->
+		if(!length $key) {                 # нового объекта ещё нет — выдаём ему первичный ключ
+			$self->_set_id($object);
+			$key = $self->get_pkey($object);
 		}
 		next if exists $self->{_area}{$key};
-			next;
-		}
 
 		$self->{_area}{$key} = $object;
 		Scalar::Util::weaken $self->{_area}{$key};
@@ -74,6 +72,19 @@ sub persist {
 	}
 	
 	$self
+}
+
+# Выдаёт новому объекту первичный ключ из генератора next: константа (-identity, -auto_increment)
+# дёргает next_val($object) у адаптера, а функция — вызывается сама
+sub _set_id {
+	my ($self, $object) = @_;
+
+	my $model = Model->get($object);
+	my $pk = $model->primary_key->{fields};
+	die "Many pk fields on ".ref($object) unless @$pk == 1;
+
+	my $gen = $model->next;
+	$object->{$pk->[0]} = ref $gen eq 'CODE'? $gen->($object): $self->_adapter->next_val($object);
 }
 
 # Отключает объекты от области слежения
@@ -237,9 +248,11 @@ sub _save {
 	return if $pkey && !@data;                    # обновлять нечего
 
 	if ($pkey) {                                  # UPDATE: только изменённые поля, по первичному ключу
-		$qb->update(@data)->filter(map {($_ => $object->{$_})} @$pk)->iter->next;
+		$qb = $qb->update(@data)->filter(map {($_ => $object->{$_})} @$pk);
+		$self->_adapter->execute($qb->{_query});
 	} else {                                      # INSERT: все поля
-		$qb->insert(@data)->iter->next;
+		$qb = $qb->insert(@data);
+		$self->_adapter->execute($qb->{_query});
 	}
 }
 
@@ -250,7 +263,8 @@ sub _delete {
 	my $model = Model->get($object);
 	my $pk = $model->primary_key->{fields};
 	my $qb = QueryBuilder->new(_appearance => $self, _from => ref $object);
-	$qb->delete->filter(map {($_ => $object->{$_})} @$pk)->iter->next;
+	$qb = $qb->delete->filter(map {($_ => $object->{$_})} @$pk);
+	$self->_adapter->execute($qb->{_query});
 }
 
 # Собирает объекты в порядке сохранения: объекты, на которые ссылаются (FK), сохраняются раньше

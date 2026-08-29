@@ -25,7 +25,7 @@ use Aion::Aya;
 presents 'authors';
 
 # The identifier
-has id => (is => 'ro', isa => Nat, pk => 1, next => -auto_increment);
+has id => (is => 'ro', isa => Nat, pk => 1, next => -identity);
 
 # Name of the author
 has name => (is => 'ro', isa => NonEmptyStr, col => 1, unique => 1);
@@ -54,7 +54,7 @@ use Aion::Aya;
 presents 'books';
 
 # The identifier
-has id => (is => 'ro', isa => Nat, pk => 1, next => -auto_increment);
+has id => (is => 'ro', isa => Nat, pk => 1, next => -identity);
 
 # Name of a book
 has title => (is => 'rw', isa => NonEmptyStr, col => 1, unique => 1);

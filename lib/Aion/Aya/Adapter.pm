@@ -26,6 +26,9 @@ sub next :Isa(Me => Hashref => Any);
 # Для выполнения insert/update/delete
 sub execute :Isa(Me => Object[Query] => PositiveInt);
 
+# Для получения следующего идентификатора
+sub next_val :Isa(Me => Object[Aion::Aya] => Str);
+
 # Сгенерированные прокси-классы сущностей: базовый класс => набор алиасов => имя класса
 my %PROXY;
 

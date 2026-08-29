@@ -58,4 +58,12 @@ sub execute :Isa(Me => Object[Query] => PositiveInt) {
 	int $rows_affected;
 }
 
+my %IDENTITY;
+# Для получения следующего идентификатора
+sub next_val :Isa(Me => Object[Aion::Aya] => Str) {
+	my ($self, $object) = @_;
+	++$IDENTITY{ref $object};
+}
+
+
 1;

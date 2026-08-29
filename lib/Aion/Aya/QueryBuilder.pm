@@ -41,19 +41,22 @@ has _query => (is => 'ro-', isa => Query, lazy => 0, defalt => sub { Query->new(
 # Переключение на операцию delete
 sub delete {
 	my ($self) = @_;
-	$self->_query->clone(operation => Query->DELETE);
+	my $query = $self->_query->clone(operation => Query->DELETE);
+	ref($self)->new(%$self, _query => $query);
 }
 
 # Переключение на операцию update, annotate превращается в секцию set 
 sub update {
 	my ($self, @update) = @_;
-	$self->_query->clone(operation => Query->UPDATE)->annotate(@update);
+	my $query = $self->_query->clone(operation => Query->UPDATE);
+	ref($self)->new(%$self, _query => $query)->annotate(@update);
 }
 
 # Переключение на операцию insert, annotate превращается в секцию set 
 sub insert {
 	my ($self, @insert) = @_;
-	$self->_query->clone(operation => Query->INSERT)->annotate(@insert);
+	my $query = $self->_query->clone(operation => Query->INSERT);
+	ref($self)->new(%$self, _query => $query)->annotate(@insert);
 }
 
 # Присоединяет другую сущность внутренним (inner) объединением
