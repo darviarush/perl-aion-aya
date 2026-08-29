@@ -34,7 +34,8 @@ sub next :Isa(Me => HashRef => Any) {
 
 	my $row = $session->{sth}->fetchrow_hashref;
 	if(defined $row) {
-		$session->{query}->from->new(%$row);
+		my $class = $self->_entity_class($session->{query}, $row);
+		$class->new(%$row);
 	} else {
 		$session->{sth}->finish;
 		$row

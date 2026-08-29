@@ -64,6 +64,13 @@ sub feature {
 	$Aion::META{$self->{pkg}}{feature}{$field} // die "Not $field!"
 }
 
+# Возвращает имена полей, являющиеся col или ref
+sub cols {
+	my ($self) = @_;
+	my $feature = $Aion::META{$self->{pkg}}{feature};
+	grep { exists $feature->{opt}{col} || exists $feature->{opt}{ref} } keys %$feature;
+}
+
 # Возвращает информацию о столбце по называнию поля 
 sub col {
 	my ($self, $field) = @_;

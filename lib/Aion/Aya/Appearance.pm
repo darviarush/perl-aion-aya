@@ -9,6 +9,7 @@ use aliased 'Aion::Aya::Adapter';
 use aliased 'Aion::Aya::Model';
 use aliased 'Aion::Aya::QueryBuilder';
 use aliased 'Aion::Aya::Transaction';
+use aliased 'Aion::Aya::Query::Expr::Val';
 
 use Aion;
 
@@ -189,8 +190,103 @@ sub get_pkey {
 # Сохраняет объекты в базу
 sub flush {
 	my ($self) = @_;
-	
-	...
+
+	# Разделяем объекты: у кого есть копия — сохраняем (insert/update), у кого нет — удаляем
+	my (@deletes, @saves);
+	for my $key (keys %{$self->{_area}}) {
+		my $object = $self->{_area}{$key} or next; # слабая ссылка могла уже отвалиться
+		push @{$self->{_copy}{$key}? \@saves: \@deletes}, $object;
+	}
+
+	# Сначала сохраняем (родители раньше детей, чтобы FK указывали на существующие записи),
+	# затем удаляем (дети раньше родителей)
+	$self->_save($_)   for $self->_ordered(@saves);
+	$self->_delete($_) for reverse $self->_ordered(@deletes);
+
+	# Переснимаем копии для следующего flush
+	for my $key (keys %{$self->{_area}}) {
+		my $object = $self->{_area}{$key} or next;
+		$self->{_copy}{$key} = $self->_snapshot($object);
+	}
+
+	$self
+}
+
+# Создаёт снимок объекта для _copy: ослабленные ссылки на поля
+sub _snapshot {
+	my ($self, $object) = @_;
+
+	my %copy = %$object;
+	Scalar::Util::weaken $copy{$_} for grep { ref $copy{$_} } keys %copy;
+	\%copy;
+}
+
+# Сохраняет объект: INSERT (если нет первичного ключа) или UPDATE изменённых полей
+sub _save {
+	my ($self, $object) = @_;
+
+	my $model = Model->get($object);
+	my $pk = $model->primary_key->{fields};
+	my $pkey = $self->get_pkey($object);          # пустое — нового объекта ещё нет в базе
+	my $qb = QueryBuilder->new(_appearance => $self, _from => ref $object);
+
+	my @data;
+	my $copy = exists $self->{_copy}->{$pkey}? $self->{_copy}->{$pkey}: {};
+	for my $field (keys %$object) {
+		next if ref $object->{$field};            # ссылки на сущности не колонки
+		next if $pkey && exists $copy->{$field} && $self->_same($copy->{$field}, $object->{$field});
+		push @data, Val->new(value => $object->{$field}) => $field;
+	}
+	return if $pkey && !@data;                    # обновлять нечего
+
+	if ($pkey) {                                  # UPDATE: только изменённые поля, по первичному ключу
+		$qb->update(@data)->filter(map {($_ => $object->{$_})} @$pk)->iter->next;
+	} else {                                      # INSERT: все поля
+		$qb->insert(@data)->iter->next;
+	}
+}
+
+# Удаляет объект из базы по первичному ключу
+sub _delete {
+	my ($self, $object) = @_;
+
+	my $model = Model->get($object);
+	my $pk = $model->primary_key->{fields};
+	my $qb = QueryBuilder->new(_appearance => $self, _from => ref $object);
+	$qb->delete->filter(map {($_ => $object->{$_})} @$pk)->iter->next;
+}
+
+# Собирает объекты в порядке сохранения: объекты, на которые ссылаются (FK), сохраняются раньше
+sub _ordered {
+	my ($self, @objects) = @_;
+
+	my %seen;
+	my @out;
+	my $visit;
+	$visit = sub {
+		my ($value) = @_;
+
+		if (Scalar::Util::blessed $value) {
+			my $id = ref($value) . FS . $value;
+			return if $seen{$id}++;
+			$visit->($_) for grep { ref $_ } values %$value;
+			push @out, $value;
+		}
+		elsif (ref $value eq 'ARRAY') {
+			$visit->($_) for @$value;
+		}
+	};
+
+	$visit->($_) for @objects;
+	@out
+}
+
+# Одинаковые ли значения
+sub _same {
+	my ($a, $b) = @_;
+	return 1 if !defined $a && !defined $b;
+	return 0 if !defined $a || !defined $b;
+	$a eq $b;
 }
 
 # Объявляет транзакцию: 
