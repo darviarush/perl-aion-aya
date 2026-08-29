@@ -43,6 +43,9 @@ has _adapter => (is => 'ro', isa => Adapter, default => sub {
 # Кеш
 has _cache => (is => 'ro', isa => 'CHI', eon => 1);
 
+# Эмиттер
+has emitter => (is => 'ro', isa => 'Aion::Emitter', eon => 1);
+
 # Область отслеживания объектов / Identity Map (Карта идентичности)
 has _area => (is => 'ro-', isa => HashRef['Aion::Aya'], lazy => 0, default => sub {+{}});
 
@@ -65,13 +68,7 @@ sub persist {
 
 		$self->{_area}{$key} = $object;
 		Scalar::Util::weaken $self->{_area}{$key};
-
-		# Ссылки в копии не задерживаются
-		my %copy = %$object;
-		while(my ($field, $val) = each %copy) {
-			Scalar::Util::weaken $copy{$field} if ref $val;
-		}
-		$self->{_copy}{$key} = \%copy;
+		$self->{_copy}{$key} = $self->_snapshot($object);
 		
 		$object->_appearance($self);
 	}
@@ -184,7 +181,7 @@ sub get_pkey {
 
 	my $model = Model->get($object);
 	my $pk = $model->primary_key or die sprintf "%s is'nt primary key", ref $object;
-	join FS, map $object->{$_}, @{$pk->{fields}};
+	join FS, map {$object->{$_}} @{$pk->{fields}};
 }
 
 # Сохраняет объекты в базу

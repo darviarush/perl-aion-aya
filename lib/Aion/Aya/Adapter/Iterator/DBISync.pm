@@ -14,6 +14,12 @@ has login => (is => 'ro', isa => Maybe[Str]);
 has password => (is => 'ro', isa => Maybe[Str]);
 has attr => (is => 'ro', isa => HashRef);
 
+# Коннект
+sub _connect_cached {
+	my ($self) = @_;
+	DBI->connect_cached($self->{dsn}, $self->{login}, $self->{password}, +{%{$self->{attr}}, RaiseError => 1, AutoCommit => 1 });
+}
+
 # Порождает итератор
 sub iterator :Isa(Me => Object[Query] => Object[Iterator]) {
 	my ($self, $query) = @_;
@@ -24,7 +30,7 @@ sub iterator :Isa(Me => Object[Query] => Object[Iterator]) {
 sub next :Isa(Me => HashRef => Any) {
 	my ($self, $session) = @_;
 
-	$session->{dbh} //= DBI->connect_cached($self->dsn, $self->login, $self->password, $self->attr);
+	$session->{dbh} //= $self->_connect_cached;
 	$session->{sth} //= do {
 		my $query = $self->transform($session->{query});
 		my $sth = $session->{dbh}->prepare($query);
@@ -40,6 +46,16 @@ sub next :Isa(Me => HashRef => Any) {
 		$session->{sth}->finish;
 		$row
 	}
+}
+
+# Для выполнения insert/update/delete
+sub execute :Isa(Me => Object[Query] => PositiveInt) {
+	my ($self, $query) = @_;
+	
+	my $dbh = $self->_connect_cached;
+	my $sql = $self->transform($query);
+	my $rows_affected = $dbh->do($sql);
+	int $rows_affected;
 }
 
 1;

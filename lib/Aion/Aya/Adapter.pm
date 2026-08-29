@@ -23,6 +23,9 @@ sub iterator :Isa(Me => Object[Query] => Object[Iterator]);
 # Следующее значение из сессии (второй параметр) или undef
 sub next :Isa(Me => Hashref => Any);
 
+# Для выполнения insert/update/delete
+sub execute :Isa(Me => Object[Query] => PositiveInt);
+
 # Сгенерированные прокси-классы сущностей: базовый класс => набор алиасов => имя класса
 my %PROXY;
 
