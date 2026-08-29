@@ -10,41 +10,29 @@ use aliased 'Aion::Aya::Model';
 use aliased 'Aion::Aya::QueryBuilder';
 use aliased 'Aion::Aya::Transaction';
 use aliased 'Aion::Aya::Query::Expr::Val';
+use aliased 'Aion::Aya::Event::PreFlush';
+use aliased 'Aion::Aya::Event::OnFlush';
+use aliased 'Aion::Aya::Event::PostFlush';
+use aliased 'Aion::Aya::Event::PrePersist';
+use aliased 'Aion::Aya::Event::PostPersist';
+use aliased 'Aion::Aya::Event::PreUpdate';
+use aliased 'Aion::Aya::Event::PostUpdate';
+use aliased 'Aion::Aya::Event::PreRemove';
+use aliased 'Aion::Aya::Event::PostRemove';
 
 use Aion;
-
-use Aion::Env::Etc ADAPTER => (
-	isa => HashRef[
-		Dict[
-			adapter => Str,
-			dsn => Str,
-			login => Option[Str], 
-			password => Option[Str],
-			attr => Option[HashRef],
-		]
-	],
-	default => {},
-	key => 'aion.aya.adapter'
-);
 
 use constant ERROR_FETCH_PKEY => "No primary key";
 use constant FS => "\f";
 
 # Адаптер для доступа к базе
-has _adapter => (is => 'ro', isa => Adapter, default => sub {
-	my ($self) = @_;
-	my $config = ADAPTER->{default} or die "aion.aya.adapter.default does not exist!";
-	my %config = %$config;
-	my $adapter_class = delete $config{adapter};
-	eval "require $adapter_class" or die;
-	$adapter_class->new(%config);
-});
+has _adapter => (is => 'ro', isa => Adapter, eon => 1);
 
 # Кеш
 has _cache => (is => 'ro', isa => 'CHI', eon => 1);
 
 # Эмиттер
-has emitter => (is => 'ro', isa => 'Aion::Emitter', eon => 1);
+has _emitter => (is => 'ro', isa => Object['Aion::Emitter'], eon => 1);
 
 # Область отслеживания объектов / Identity Map (Карта идентичности)
 has _area => (is => 'ro-', isa => HashRef['Aion::Aya'], lazy => 0, default => sub {+{}});
@@ -199,6 +187,8 @@ sub get_pkey {
 sub flush {
 	my ($self) = @_;
 
+	$self->_emit_flush(PreFlush);
+
 	# Разделяем объекты: у кого есть копия — сохраняем (insert/update), у кого нет — удаляем
 	my (@deletes, @saves);
 	for my $key (keys %{$self->{_area}}) {
@@ -206,10 +196,14 @@ sub flush {
 		push @{$self->{_copy}{$key}? \@saves: \@deletes}, $object;
 	}
 
+	$self->_emit_flush(OnFlush);
+
 	# Сначала сохраняем (родители раньше детей, чтобы FK указывали на существующие записи),
 	# затем удаляем (дети раньше родителей)
 	$self->_save($_)   for $self->_ordered(@saves);
 	$self->_delete($_) for reverse $self->_ordered(@deletes);
+
+	$self->_emit_flush(PostFlush);
 
 	# Переснимаем копии для следующего flush
 	for my $key (keys %{$self->{_area}}) {
@@ -248,11 +242,15 @@ sub _save {
 	return if $pkey && !@data;                    # обновлять нечего
 
 	if ($pkey) {                                  # UPDATE: только изменённые поля, по первичному ключу
+		$self->_emit_entity(PreUpdate, $object);
 		$qb = $qb->update(@data)->filter(map {($_ => $object->{$_})} @$pk);
-		$self->_adapter->execute($qb->{_query});
+		$qb->execute;
+		$self->_emit_entity(PostUpdate, $object);
 	} else {                                      # INSERT: все поля
+		$self->_emit_entity(PrePersist, $object);
 		$qb = $qb->insert(@data);
-		$self->_adapter->execute($qb->{_query});
+		$qb->execute;
+		$self->_emit_entity(PostPersist, $object);
 	}
 }
 
@@ -264,7 +262,9 @@ sub _delete {
 	my $pk = $model->primary_key->{fields};
 	my $qb = QueryBuilder->new(_appearance => $self, _from => ref $object);
 	$qb = $qb->delete->filter(map {($_ => $object->{$_})} @$pk);
+	$self->_emit_entity(PreRemove, $object);
 	$self->_adapter->execute($qb->{_query});
+	$self->_emit_entity(PostRemove, $object);
 }
 
 # Собирает объекты в порядке сохранения: объекты, на которые ссылаются (FK), сохраняются раньше
@@ -298,6 +298,18 @@ sub _same {
 	return 1 if !defined $a && !defined $b;
 	return 0 if !defined $a || !defined $b;
 	$a eq $b;
+}
+
+# Рассылает flush-событие
+sub _emit_flush {
+	my ($self, $class) = @_;
+	$self->_emitter->emit($class->new(adapter => $self));
+}
+
+# Рассылает событие конкретной сущности
+sub _emit_entity {
+	my ($self, $class, $object) = @_;
+	$self->_emitter->emit($class->new(adapter => $self, entity => $object));
 }
 
 # Объявляет транзакцию: 
