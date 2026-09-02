@@ -6,6 +6,11 @@ use Coro qw//;
 
 use Aion;
 
+has dsn => (is => 'ro', isa => Str, default => 'DBI:Mem:');
+has login => (is => 'ro', isa => Undef);
+has password => (is => 'ro', isa => Undef);
+has attr => (is => 'ro', isa => HashRef, lazy => 0, default => sub {+{}});
+
 with 'Aion::Aya::Adapter::Iterator::DBI';
 with 'Aion::Aya::Adapter::Transform::SQL';
 
