@@ -167,6 +167,8 @@ $tx->rollback;
 AuthorBox->find_one_by_name('Dostoevsky F.M.') # -> undef
 ```
 
+# EXAMPLES
+
 Если переменную, хранящую транзакцию, не закоммитить, то при уничтожении она вызовет `rollback`:
 
 ```perl
@@ -187,6 +189,18 @@ my $appearance = Appearance->new;
 create_attempt($appearance, 'Chekhov A.P.');
 
 AuthorBox->find_one_by_name('Chekhov A.P.') # -> undef
+```
+
+Транзакция открытая в внутри другой вызовет исключение:
+
+```perl
+{
+    my $tx = $appearance->transaction;
+
+    $appearance->transaction # @-> Transaction beginned!
+
+    $tx->rollback;
+}
 ```
 
 # GOTCHAS
