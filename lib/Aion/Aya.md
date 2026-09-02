@@ -10,7 +10,26 @@ Aion::Aya - ORM
 
 Файл .env:
 ```text
-AION_AYA_ADAPTER = Aion::Aya::Adapter::Memory
+AION_PLEROMA_AUTOWARE = 1
+AION_PLEROMA_INI      = etc/annotation/eon.ann
+```
+
+Файл etc/eon.yml:
+```yaml
+aion:
+  eon:
+    Aion::Aya::Adapter:
+      class: Aion::Aya::Adapter::SQLSyncAdapter
+      arguments:
+        dsn: 'DBI:Mem:'
+        login: ~
+        password: ~
+        attr:
+          RaiseError: 1
+    CHI:
+      class: CHI
+      arguments:
+        driver: Memory
 ```
 
 Файл lib/Liberia/Storage/Author/Author.pm:

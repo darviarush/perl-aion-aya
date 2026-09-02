@@ -32,7 +32,7 @@ has _adapter => (is => 'ro', isa => Adapter, eon => 1);
 has _cache => (is => 'ro', isa => 'CHI', eon => 1);
 
 # Эмиттер
-has _emitter => (is => 'ro', isa => Object['Aion::Emitter'], eon => 1);
+has _emitter => (is => 'ro', isa => 'Aion::Emitter', eon => 1);
 
 # Область отслеживания объектов / Identity Map (Карта идентичности)
 has _area => (is => 'ro-', isa => HashRef['Aion::Aya'], lazy => 0, default => sub {+{}});
