@@ -2,6 +2,8 @@ package Aion::Aya::Adapter::MysqlAdapter;
 
 use common::sense;
 
+use Coro::Mysql;
+
 use Aion;
 
 with 'Aion::Aya::Adapter::Iterator::DBI';

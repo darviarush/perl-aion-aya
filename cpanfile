@@ -32,6 +32,9 @@ on 'test' => sub {
 	requires 'open';
 };
 
+recomendation 'DBD::MariaDB';
+recomendation 'Coro::Mysql';
+
 requires 'Aion';
 requires 'CHI';
 requires 'common::sense';
