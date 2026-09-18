@@ -26,7 +26,9 @@ package Liberia::Storage::Author::Author;
 use common::sense;
 use aliased 'Liberia::Storage::Book::Book';
 
-use Aion::Aya;
+use Aion;
+
+with 'Aion::Aya';
 
 # Authors of the Liberia
 presents 'authors';
@@ -55,7 +57,9 @@ package Liberia::Storage::Book::Book;
 use common::sense;
 use aliased 'Liberia::Storage::Author::Author';
 
-use Aion::Aya;
+use Aion;
+
+with 'Aion::Aya';
 
 # Books of the Liberia
 presents 'books';
@@ -84,7 +88,9 @@ package Liberia::Storage::Book::BookBox;
 use common::sense;
 use aliased 'Liberia::Storage::Book::Book';
 
-use Aion::Aya::Box;
+use Aion;
+
+with 'Aion::Aya::Box';
 
 box_for Book;
 

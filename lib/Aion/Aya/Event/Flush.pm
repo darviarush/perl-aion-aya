@@ -8,6 +8,6 @@ use Aion;
 extends 'Aion::Aya::Event';
 
 # Окружение / менеджер сущностей, в котором происходит flush
-has adapter => (is => 'ro', isa => Object);
+has adapter => (is => 'ro', isa => 'Aion::Aya::Adapter');
 
 1;

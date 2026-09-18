@@ -9,6 +9,21 @@ use aliased 'Aion::Aya::Model';
 
 use Aion -role;
 
+# Класс для сравнения модели и структуры базы
+req diff_class => (is => 'ro', isa => PackageName);
+
+# Возвращает класс для сравнения модели и структуры базы
+has comparator => (is => 'ro', isa => '', default => sub {
+	my ($self) = @_;
+
+	my $class = $self->diff_class . '.pm';
+	$class =~ s!::!/!g;
+	require $class;
+
+	$class->new(adapter => $self);
+}
+
+
 req dsn => (is => 'ro', isa => Str);
 req login => (is => 'ro', isa => Maybe[Str]);
 req password => (is => 'ro', isa => Maybe[Str]);

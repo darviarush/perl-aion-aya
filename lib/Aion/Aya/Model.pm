@@ -51,6 +51,21 @@ has memory_key => (is => 'ro', isa => HashRef[Key], lazy => 0, default => sub {+
 # Индексы для загрузки нескольких полей из базы, если затронут только один
 has fetch_key => (is => 'ro', isa => HashRef[Key], lazy => 0, default => sub {+[]});
 
+sub _find_aya(@);
+
+# Модели проекта
+has models => (is => 'ro', isa => ArrayRef[ClassName], default => sub {
+	my ($self) = @_;
+
+	my $aya_files = _find_aya "lib";
+
+	for my $aya_file ($aya_files) {
+		require $aya_file unless $aya_file ~~ ClassName and ;
+	}
+
+	sort keys %Aion::Aya::META;
+});
+
 # Вернуть модель по классу или объекту
 sub get {
 	my ($self, $object) = @_;
@@ -96,6 +111,36 @@ sub col_name {
 	}
 
 	die "$field have'nt column!";
+}
+
+my @_aya_path;
+sub _find_aya(@) {
+    my @dirs = @_;
+    while(@dirs) {
+    	my $dir = pop @dirs;
+     	opendir my $dh, $dir or die "$dir: $!";
+	    while(my $file = readdir $dh) {
+			next if $file =~ /^\.\.?$/;
+			my $path = "$dir/$file";
+			if(-d $path) {
+	        	push @dirs, $path;
+			}
+			elsif($path =~ /\.pm$/) {
+				open my $f, "<:encode(utf8)", $path or die "$path: $!";
+				while(<$f>) {
+					last if /^__(END|DATA)__$/;
+					if(/^use\s*Aion::Aya\s*;/) {
+						push @_aya_path, $path;
+					 	last;
+					}
+				}
+				close $f;
+			}
+	    }
+		closedir $dh;
+	}
+
+    \@_aya_path;
 }
 
 1;

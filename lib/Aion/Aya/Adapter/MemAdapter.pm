@@ -6,6 +6,9 @@ use Coro qw//;
 
 use Aion;
 
+# Класс для сравнения модели и базы
+has diff_class => (is => 'ro', isa => PackageName, default => 'Aion::Aya::Adapter::Diff::DDL');
+
 has dsn => (is => 'ro', isa => Str, default => 'DBI:Mem:');
 has login => (is => 'ro', isa => Undef);
 has password => (is => 'ro', isa => Undef);

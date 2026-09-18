@@ -129,6 +129,7 @@ sub execute :Isa(Me => Object[Query] => PositiveInt) {
 	my $sql = $self->transform($query);
 	my $dbh = $self->connect;
 	my $rows_affected = $self->do($dbh, $sql);
+	$self->finish($dbh);
 	int $rows_affected;
 }
 

@@ -12,17 +12,15 @@ use aliased 'Aion::Aya::Model';
 
 use Aion -role;
 
-# Трансформирует запрос в промежуточное представление
+# Трансформирует запрос в промежуточное представление DQL или DML
 sub transform :Isa(Me => Query => Str) {
 	my ($self, $query) = @_;
 
-	do {
-		given($query->operation) {
-			$self->sql_select($query) when Query->SELECT;
-			$self->sql_insert($query) when Query->INSERT;
-			$self->sql_update($query) when Query->UPDATE;
-			$self->sql_delete($query) when Query->DELETE;
-		}
+	given($query->operation) {
+		$self->sql_select($query) when Query->SELECT;
+		$self->sql_insert($query) when Query->INSERT;
+		$self->sql_update($query) when Query->UPDATE;
+		$self->sql_delete($query) when Query->DELETE;
 	}
 }
 
