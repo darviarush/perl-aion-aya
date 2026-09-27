@@ -107,7 +107,7 @@ sub next :Isa(Me => HashRef => Any) {
 
 	$session->{dbh} //= $self->connect;
 	$session->{sth} //= do {
-		my $query = $self->transform($session->{query});
+		my $query = $self->transformator->transform($session->{query});
 		$self->prepare($session->{dbh}, $query);
 	};
 
@@ -126,7 +126,7 @@ sub next :Isa(Me => HashRef => Any) {
 sub execute :Isa(Me => Object[Query] => PositiveInt) {
 	my ($self, $query) = @_;
 	
-	my $sql = $self->transform($query);
+	my $sql = $self->transformator->transform($query);
 	my $dbh = $self->connect;
 	my $rows_affected = $self->do($dbh, $sql);
 	$self->finish($dbh);

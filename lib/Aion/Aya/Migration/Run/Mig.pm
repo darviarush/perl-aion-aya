@@ -18,7 +18,7 @@ has down => (is => 'ro', isa => Bool, arg => -d);
 has migration => (is => 'ro', isa => MigNum, arg => 1);
 
 #@run aya:migratio:mig „Up/down migration”
-sub mig {
+sub run {
 	my ($self) = @_;
 
 	die "" unless defined $self->migration;

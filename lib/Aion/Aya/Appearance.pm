@@ -26,13 +26,17 @@ use constant ERROR_FETCH_PKEY => "No primary key";
 use constant FS => "\f";
 
 # Адаптер для доступа к базе
-has _adapter => (is => 'ro', isa => Adapter, eon => 1);
+has adapter => (is => 'ro+', isa => Adapter);
 
 # Кеш
-has _cache => (is => 'ro', isa => 'CHI', eon => 1);
+has cache => (is => 'ro', isa => 'CHI', default => sub {
+	my ($self) = @_;
+
+	CHI->new(driver => 'None');
+});
 
 # Эмиттер
-has _emitter => (is => 'ro', isa => 'Aion::Emitter', eon => 1);
+has emitter => (is => 'ro', isa => 'Aion::Emitter', eon => 1);
 
 # Область отслеживания объектов / Identity Map (Карта идентичности)
 has _area => (is => 'ro-', isa => HashRef['Aion::Aya'], lazy => 0, default => sub {+{}});
@@ -72,7 +76,7 @@ sub _set_id {
 	die "Many pk fields on ".ref($object) unless @$pk == 1;
 
 	my $gen = $model->next;
-	$object->{$pk->[0]} = ref $gen eq 'CODE'? $gen->($object): $self->_adapter->next_val($object);
+	$object->{$pk->[0]} = ref $gen eq 'CODE'? $gen->($object): $self->adapter->next_val($object);
 }
 
 # Отключает объекты от области слежения
@@ -122,11 +126,11 @@ sub fetch {
 	my $model = Model->get($object);
 
 	# Поле входит в memory_key: достаём всю строку этого ключа из кеша
-	if ($self->_cache && (my $memory_key = $model->memory_key->{$field})) {
+	if ($self->cache && (my $memory_key = $model->memory_key->{$field})) {
 		my $cache_key = $self->_cache_key($memory_key, $model, $object);
 
 		# Если ключа ещё нет в кеше — подгружаем поля ключа из базы и кладём туда
-		my $value = $self->_cache->compute($cache_key, undef, sub {
+		my $value = $self->cache->compute($cache_key, undef, sub {
 			my $obj = $self->_fetch($object, @{$memory_key->{fields}});
 			+{ map { $_ => $obj->{$_} } @{$memory_key->{fields}} };
 		});
@@ -263,7 +267,7 @@ sub _delete {
 	my $qb = QueryBuilder->new(_appearance => $self, _from => ref $object);
 	$qb = $qb->delete->filter(map {($_ => $object->{$_})} @$pk);
 	$self->_emit_entity(PreRemove, $object);
-	$self->_adapter->execute($qb->{_query});
+	$self->adapter->execute($qb->{_query});
 	$self->_emit_entity(PostRemove, $object);
 }
 
@@ -303,13 +307,13 @@ sub _same {
 # Рассылает flush-событие
 sub _emit_flush {
 	my ($self, $class) = @_;
-	$self->_emitter->emit($class->new(adapter => $self));
+	$self->emitter->emit($class->new(adapter => $self));
 }
 
 # Рассылает событие конкретной сущности
 sub _emit_entity {
 	my ($self, $class, $object) = @_;
-	$self->_emitter->emit($class->new(adapter => $self, entity => $object));
+	$self->emitter->emit($class->new(adapter => $self, entity => $object));
 }
 
 # Объявляет транзакцию: 

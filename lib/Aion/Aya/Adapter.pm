@@ -12,6 +12,9 @@ use Aion -role;
 # Класс для сравнения модели и структуры базы
 req diff_class => (is => 'ro', isa => PackageName);
 
+# Трансформирует запрос в промежуточное представление (например, SQL или структуру у Elastic)
+req transformator => (is => 'ro', isa => 'Aion::Aya::Adapter::Transform::Abstract');
+
 # Возвращает класс для сравнения модели и структуры базы
 has comparator => (is => 'ro', isa => '', default => sub {
 	my ($self) = @_;
@@ -28,9 +31,6 @@ req dsn => (is => 'ro', isa => Str);
 req login => (is => 'ro', isa => Maybe[Str]);
 req password => (is => 'ro', isa => Maybe[Str]);
 req attr => (is => 'ro', isa => HashRef);
-
-# Трансформирует запрос в промежуточное представление (например, SQL или структуру у Elastic)
-sub transform :Isa(Me => Object[Query] => (ArrayRef|HashRef|Str));
 
 # Порождает итератор
 sub iterator :Isa(Me => Object[Query] => Object[Iterator]);

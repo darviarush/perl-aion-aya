@@ -12,9 +12,15 @@ Aion::Aya - ORM
 ```yaml
 aion:
   eon:
-    Aion::Aya::Adapter:
+    Aion::Aya::Appearance:
+        argumens:
+            adapter: "@aion.aya.adapter"
+            cache: "@aion.aya.cache"
+
+    aion.aya.adapter:
       class: Aion::Aya::Adapter::MemAdapter
-    CHI:
+
+    aion.aya.cache:
       class: CHI
       arguments:
         driver: None
@@ -26,9 +32,7 @@ package Liberia::Storage::Author::Author;
 use common::sense;
 use aliased 'Liberia::Storage::Book::Book';
 
-use Aion;
-
-with 'Aion::Aya';
+use Aion with => 'Aion::Aya';
 
 # Authors of the Liberia
 presents 'authors';
@@ -57,9 +61,7 @@ package Liberia::Storage::Book::Book;
 use common::sense;
 use aliased 'Liberia::Storage::Author::Author';
 
-use Aion;
-
-with 'Aion::Aya';
+use Aion with => 'Aion::Aya';
 
 # Books of the Liberia
 presents 'books';
@@ -88,9 +90,7 @@ package Liberia::Storage::Book::BookBox;
 use common::sense;
 use aliased 'Liberia::Storage::Book::Book';
 
-use Aion;
-
-with 'Aion::Aya::Box';
+use Aion with => 'Aion::Aya::Box';
 
 box_for Book;
 
@@ -163,6 +163,12 @@ sub title {
 Код:
 ```perl
 use common::sense;
+
+use aliased 'Aion::Aya::Migration::Run::MkMig';
+use aliased 'Aion::Aya::Migration::Run::MigAll';
+
+MkMig->new->run;
+MigAll->new->run;
 
 use aliased 'Liberia::Action::BookAction';
 

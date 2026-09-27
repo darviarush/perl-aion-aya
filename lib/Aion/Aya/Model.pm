@@ -3,68 +3,45 @@ package Aion::Aya::Model;
 
 use common::sense;
 
+use aliased 'Aion::Aya::Table';
+
 use Aion;
 
+extends Table;
+
 BEGIN {
-	subtype 'Key', as Dict[
+	subtype 'Field', as Dict[
 		name => Str,
-		fields => ArrayRef[Str],
-		options => ArrayRef[Str],
+		type => Enum[qw/col ref bk m2m n2m m2n/],
+		col_name => Option[Str], # столбец есть у col и ref. Описание его в column
+		ref => Option[Tuple[PackageName, Str]], # ссылка на другую модель. Используется ref и bk
+		table => Option[Table], # для m2m связей – ссылка на промежуточную таблицу
 	];
 
-	subtype 'ForeignKey', as Dict[
-		name => Str,
-		to_class => PackageName,
+	subtype 'MemoryKey', as Dict[
+		key => Str,
 		fields => ArrayRef[Str],
-		to_fields => ArrayRef[Str],
-		options => ArrayRef[Str],
+	];
+
+	subtype 'FetchKey', as Dict[
+		fields => ArrayRef[Str],
 	];
 }
 
 # Класс модели Aya
 has pkg => (is => 'ro+', isa => PackageName);
 
-# Имя таблицы в базе
-has table => (is => 'ro+', isa => Str);
-
-# Опции таблицы в базе
-has options => (is => 'ro', isa => Undef|Str|ArrayLike|HashLike);
-
 # Генератор следующего значения
 has next => (is => 'ro', isa => Object|Str|Undef);
 
-# Первичный ключ
-has primary_key => (is => 'ro', isa => Key);
-
-# Уникальные ключи
-has unique_keys => (is => 'ro', isa => ArrayRef[Key], lazy => 0, default => sub {+[]});
-
-# Индексы
-has index_keys => (is => 'ro', isa => ArrayRef[Key], lazy => 0, default => sub {+[]});
-
-# Внешние ключи
-has foreign_keys => (is => 'ro', isa => ArrayRef[ForeignKey], lazy => 0, default => sub {+[]});
+# Поля
+has field => (is => 'ro', isa => HashRef[Field]);
 
 # Индексы в кеше: field => Key
-has memory_key => (is => 'ro', isa => HashRef[Key], lazy => 0, default => sub {+[]});
+has memory_key => (is => 'ro', isa => HashRef[MemoryKey], lazy => 0, default => sub {+[]});
 
 # Индексы для загрузки нескольких полей из базы, если затронут только один
-has fetch_key => (is => 'ro', isa => HashRef[Key], lazy => 0, default => sub {+[]});
-
-sub _find_aya(@);
-
-# Модели проекта
-has models => (is => 'ro', isa => ArrayRef[ClassName], default => sub {
-	my ($self) = @_;
-
-	my $aya_files = _find_aya "lib";
-
-	for my $aya_file ($aya_files) {
-		require $aya_file unless $aya_file ~~ ClassName and ;
-	}
-
-	sort keys %Aion::Aya::META;
-});
+has fetch_key => (is => 'ro', isa => HashRef[FetchKey], lazy => 0, default => sub {+[]});
 
 # Вернуть модель по классу или объекту
 sub get {
@@ -86,61 +63,50 @@ sub cols {
 	grep { exists $feature->{opt}{col} || exists $feature->{opt}{ref} } keys %$feature;
 }
 
-# Возвращает информацию о столбце по называнию поля 
-sub col {
-	my ($self, $field) = @_;
-	$self->feature->{opt}{col} // die "Not col on $field!"
-}
-
 # Возвращает имя столбца по полю
 sub col_name {
 	my ($self, $field) = @_;
 	
-	my $feature = $self->feature($field);
-	my $name = $feature->{name};
-	
-	if(my $col = $feature->{opt}{col}) {
-		return $name if $col eq 1;
-		return $col if !ref $col;
-		return $col->{column};
-	}
-
-	if(my $ref = $feature->{opt}{ref}) {
-		return "$name\_id" if $ref eq 1;
-		return $ref->{column};
-	}
-
-	die "$field have'nt column!";
+	$self->{field}{$field}{col_name} // die "$field have'nt column!";
 }
 
-my @_aya_path;
-sub _find_aya(@) {
-    my @dirs = @_;
-    while(@dirs) {
-    	my $dir = pop @dirs;
-     	opendir my $dh, $dir or die "$dir: $!";
-	    while(my $file = readdir $dh) {
-			next if $file =~ /^\.\.?$/;
-			my $path = "$dir/$file";
-			if(-d $path) {
-	        	push @dirs, $path;
-			}
-			elsif($path =~ /\.pm$/) {
-				open my $f, "<:encode(utf8)", $path or die "$path: $!";
-				while(<$f>) {
-					last if /^__(END|DATA)__$/;
-					if(/^use\s*Aion::Aya\s*;/) {
-						push @_aya_path, $path;
-					 	last;
-					}
-				}
-				close $f;
-			}
-	    }
-		closedir $dh;
-	}
+# Возвращает
+sub get_ref {
+	my ($self, $feature) = @_;
 
-    \@_aya_path;
+	my $isa = $feature->{isa}{name} eq 'Maybe'? $feature->{isa}{args}[0]: $feature->{isa};
+
+	die "$feature->{name} with ref: isa maybe Object!" unless $isa->{name} eq 'Object';
+
+	$isa->{args}[0]
+}
+
+# Создаёт триггеры на фиче
+sub make_column_feature {
+	my ($self, $feature) = @_;
+	my $name = $feature->{name};
+	$feature->construct
+		->add_access("\$self->_appearance->fetch(\$self, '$name') unless exists \$self->{$name};")
+		->add_trigger("\$self->_appearance->store(\$self, '$name')")
+		->add_cleaner("\$self->_appearance->clear(\$self, '$name')")
+	;
+}
+
+sub _column_builder {
+	my ($self) = @_;
+
+	my $feature_href = $Aion::META{ref $self}{feature}; 
+	
+	for my $field (%{$self->{field}}) {
+		my $feature = $feature_href->{$field};
+		my $isa = $feature->{isa};
+		my $is_nullable = $isa->{name} eq 'Maybe'? do { $isa = $isa->{args}[0]; 1 }: 0;
+		my %column = (
+			name => $self->col_name(),
+			is_nullable => $is_nullable,
+		);
+	}
+	
 }
 
 1;

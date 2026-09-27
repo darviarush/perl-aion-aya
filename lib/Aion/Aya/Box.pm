@@ -7,31 +7,7 @@ use aliased 'Aion::Aya::Query::Expr::Field';
 use aliased 'Aion::Aya::Query::Expr::Val';
 use aliased 'Aion::Aya::Query::Order';
 
-use Aion -role;
-
-my @export = qw/box_for F EXIST COUNT MIN MAX SUM AVG CAST DESC ASC/;
-
-sub import {
-	my (undef, @attrs) = @_;
-	my $pkg = caller;
-
-	local $" = " ";
-	my $attrs = @attrs? " qw{@attrs}": "";
-	eval "use Aion$attrs; with qw/Aion::Aya::Box/; 1" or die;
-	
-	*{"$pkg\::$_"} = \&$_ for @export;
-}
-
-sub unimport {
-	my (undef, @attrs) = @_;
-	my $pkg = caller;
-
-   	local $" = " ";
-    my $attrs = @attrs? " qw{@attrs}": "";
-	eval "no Aion$attrs; 1" or die;
-	
-	undef &{"$pkg\::$_"} for @export;
-}
+use Aion -role, -export => [qw/box_for F EXIST COUNT MIN MAX SUM AVG CAST DESC ASC/];
 
 # Устанавливает/возвращает класс объектов
 sub box_for($) {

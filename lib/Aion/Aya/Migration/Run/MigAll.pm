@@ -18,7 +18,7 @@ has down => (is => 'ro', isa => Bool, arg => -d);
 has migration => (is => 'ro', isa => Maybe[MigNum], arg => 1);
 
 #@run aya:migration:migall „Up/down all migration”
-sub migall {
+sub run {
 	my ($self) = @_;
 	
 	if($self->down) {	

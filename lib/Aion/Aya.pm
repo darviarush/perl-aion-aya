@@ -6,33 +6,10 @@ our $VERSION = "0.0.0";
 
 use Aion::Aya::Model;
 
-use Aion -role;
+use Aion -role, -export => [qw/presents primary_key unique_key index_key foreign_key memory_key fetch_key/];
 
 # Информация о таблицах
 our %META;
-
-# Импорт функций в модуль
-sub import {
-	my (undef, @attrs) = @_;
-	my $pkg = caller;
-
-	local $" = " ";
-	my $attrs = @attrs? " qw{@attrs}": "";
-	eval "use Aion$attrs; with qw/Aion::Aya/; 1" or die;
-	
-	*{"$pkg\::$_"} = \&$_ for qw/presents primary_key unique_key index_key foreign_key memory_key fetch_key/;
-}
-
-sub unimport {
-	my (undef, @attrs) = @_;
-	my $pkg = caller;
-
-   	local $" = " ";
-    my $attrs = @attrs? " qw{@attrs}": "";
-	eval "no Aion$attrs; 1" or die;
-	
-	undef &{"$pkg\::$_"} for qw/box_for/;
-}
 
 # Менеджер сущностей
 has _appearance => (is => 'ro', isa => Maybe['Aion::Aya::Appearance'], eon => 1);
@@ -91,23 +68,23 @@ sub foreign_key(@) {
 # Когда запрашивается поле из entity и его там нет, то оно подгружается из кеша по ключу в который входит. Заодно подгружаются и все другие поля в этом ключе.
 # Если же поле не входит ни в один memory_key или fetch_key, то оно будет загружатся из базы в гордом одиночестве, что может понадобится для блобов и других объёмных полей
 sub memory_key(@) {
-	my ($name_format, $fields, @options) = @_;
+	my ($key_format, $fields, @options) = @_;
 	my $meta = $META{caller()};
-	my $key = {name => $name_format, fields => $fields, options => \@options};
-	Aion::Aya::Model->Key->validate($key, "memory_key $name_format");
+	my $key = {key_format => $key_format, fields => $fields, options => \@options};
+	Aion::Aya::Model->MemoryKey->validate($key, "memory_key $key_format");
 	for my $field (@$fields) {
-		die "$name_format and $meta->{memory_key}{$_}{name} memory_keys use one field $field!" if exists $meta->{memory_key}{$_};
+		die "$key_format and $meta->{memory_key}{$_}{key_format} memory_keys use one field $field!" if exists $meta->{memory_key}{$_};
 		$meta->{memory_key}{$_} = $key;
 	}
 }
 
 # Когда поле будет запрошено из Entity, то оно загрузится вместе с другими полями в ключе, если эти поля отсутствуют в объекте
 sub fetch_key(@) {
-	my ($fields, @options) = @_;
+	my ($fields) = @_;
 	my $meta = $META{caller()};
 	my $name = join "-", @$fields;
-	my $key = {name => $name, fields => $fields, options => \@options};
-	Aion::Aya::Model->Key->validate($key, "fetch_key $name");
+	my $key = {fields => $fields};
+	Aion::Aya::Model->FetchKey->validate($key, "fetch_key");
 	for my $field (@$fields) {
 		die "$name and $meta->{fetch_key}{$_}{name} fetch_keys use one field $field!" if exists $meta->{fetch_key}{$_};
 		$meta->{fetch_key}{$_} = $key;
@@ -129,38 +106,96 @@ aspect next => sub {
 	$META{$cls}->next($value);
 };
 
-my $make_column_feature = sub {
-	my ($feature) = @_;
-	my $name = $feature->{name};
-	$feature->construct
-		->add_access("\$self->_appearance->fetch(\$self, '$name') unless exists \$self->{$name};")
-		->add_trigger("\$self->_appearance->store(\$self, '$name')")
-		->add_cleaner("\$self->_appearance->clear(\$self, '$name')")
-	;
-};
-
 # Объявляет поле таблицы
 aspect col => sub {
 	my ($value, $feature) = @_;
-	$make_column_feature->($feature);
+
+	Model->make_column_feature($feature);
+
+	my $cls = $feature->{cls};
+	my $model = $META{$cls};
+	my $name = $feature->{name};
+
+	$value = {} if $value eq 1;
+	
+	Model->Column->validate($value, "$name/col");
+	$value->{order} //= 1+keys %{$model->{column}};
+
+	my $col_name = $value->{name} // $name;
+
+	my $field = {
+		name => $name,
+		type => 'col',
+		col_name => $col_name,
+	};
+
+	Model->Field->validate($field, "$name/col/field");
+	$model->{field}{$name} = $field;
 };
 
 # Объявляет прямую ссылку на другую таблицу
 aspect ref => sub {
 	my ($value, $feature) = @_;
-	$make_column_feature->($feature);
+
+	Model->make_column_feature($feature);
+
+	my $cls = $feature->{cls};
+	my $model = $META{$cls};
+	my $name = $feature->{name};
+	
+	Dict([
+		name_ref => Option[Str],
+		col => Option[Model->Column],
+	])->validate($value, "$name/ref") if ref $value;
+	
+	my $ref_field = $value eq 1? 'id': ref $value? $value->{ref_name} // 'id': $value =~ s/^-//;
+	
+	my $col = ref $value? $value->{col} // {}: {};
+	$col->{order} //= 1+keys %{$model->{column}};
+
+	my $col_name = $value->{name} // "$name\_id";
+	my $ref = Model->get_ref($feature);
+
+	my $field = {
+		name => $name,
+		type => 'ref',
+		col_name => $col_name,
+		ref => [$ref, $ref_field],
+	};
+
+	Model->Field->validate($field, "$name/ref/field");
+	$model->{field}{$name} = $field;
 };
 
 # Объявляет обратную ссылку с другой таблицы или связи многие-ко-многим
 aspect bk => sub {
 	my ($value, $feature) = @_;
-	$make_column_feature->($feature);
+
+	Model->make_column_feature($feature);
+
+	my $cls = $feature->{cls};
+	my $model = $META{$cls};
+	my $name = $feature->{name};
+
+	my $ref = Model->get_ref($feature);
+	my $ref_field = $value =~ s/^-//r;
+
+	my $field = {
+		name => $name,
+		type => 'bk',
+		ref => [$ref, $ref_field],
+	};
+
+	Model->Field->validate($field, "$name/bk/field");
+	$model->{field}{$name} = $field;
 };
 
 # Объявляет связь многие-ко-многим на другую таблицу
 aspect m2n => sub {
 	my ($value, $feature) = @_;
-	$make_column_feature->($feature);
+
+	Model->make_column_feature($feature);
+	
 };
 
 1;

@@ -10,7 +10,9 @@ use aliased 'Aion::Aya::Query::Expr::UOp';
 use aliased 'Aion::Aya::Query::Expr::Val';
 use aliased 'Aion::Aya::Model';
 
-use Aion -role;
+use Aion;
+
+extends 'Aion::Aya::Adapter::Transform::Abstract';
 
 # Трансформирует запрос в промежуточное представление DQL или DML
 sub transform :Isa(Me => Query => Str) {
