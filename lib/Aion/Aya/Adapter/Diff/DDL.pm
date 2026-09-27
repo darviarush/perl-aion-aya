@@ -9,7 +9,7 @@ use aliased 'Aion::Aya::Model';
 
 use Aion;
 
-with 'Aion::Aya::Adapter::Diff::Abstract';
+extends 'Aion::Aya::Adapter::Diff::Abstract';
 
 # Сравнивает модели и базу
 sub diff :Isa(Me => Array[ClassName] => Str) {

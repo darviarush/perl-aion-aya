@@ -8,7 +8,7 @@ use Aion::Aya::Model;
 
 use Aion -role, -export => [qw/presents primary_key unique_key index_key foreign_key memory_key fetch_key/];
 
-# Информация о таблицах
+# Информация о таблицах: класс => Aion::Aya::Model
 our %META;
 
 # Менеджер сущностей
@@ -180,14 +180,38 @@ aspect bk => sub {
 };
 
 # Объявляет связь многие-ко-многим на другую таблицу
+# has x => (is => 'ro', isa => 'RefClass', m2m => 1);
+# has x => (is => 'ro', isa => 'RefClass', m2m => -bk_field);
+# has x => (is => 'ro', isa => 'RefClass', m2m => {
+# 	table => 'table_name', # если не указана - имена таблиц через 2 с постфиксом _m2m
+#   options => [table_options],
+#   ref_field => '', # если не указан - id
+#   bk_field => '', # если не указан - id
+# });
 aspect m2m => sub {
 	my ($value, $feature) = @_;
 
+	my $cls = $feature->{cls};
+	my $model = $META{$cls};
+	my $name = $feature->{name};
+	
 	Aion::Aya::Model->make_column_feature($feature);
 
 	my $ref_cls = Aion::Aya::Model->get_ref($feature);
 
+	my $table = ...;
 	
+	my $m2m_table = Aion::Aya::Table->new(table => $table);
+
+	my $field = {
+		name => $name,
+		type => 'm2m',
+		ref => [$ref, $ref_field, $bk_field],
+		table => $m2m_table,
+	};
+
+	Aion::Aya::Model->Field->validate($field, "$name/ref/field");
+	$model->{field}{$name} = $field;
 };
 
 #@category Аспекты для индексов
