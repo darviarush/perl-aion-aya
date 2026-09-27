@@ -1,5 +1,5 @@
 package Aion::Aya::Migration::Run::MigAll;
-# Выполняет миграцию
+# Выполняет все миграции
 
 use common::sense;
 
@@ -20,6 +20,8 @@ has migration => (is => 'ro', isa => Maybe[MigNum], arg => 1);
 #@run aya:migration:migall „Up/down all migration”
 sub run {
 	my ($self) = @_;
+
+	require ...;
 	
 	if($self->down) {	
 		# Накатить все миграции, которые ещё не были накачены до указанной

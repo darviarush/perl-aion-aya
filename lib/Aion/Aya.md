@@ -164,11 +164,9 @@ sub title {
 ```perl
 use common::sense;
 
-use aliased 'Aion::Aya::Migration::Run::MkMig';
-use aliased 'Aion::Aya::Migration::Run::MigAll';
-
-MkMig->new->run;
-MigAll->new->run;
+system "aion-scan" # -> 0
+system "act mkmig" # -> 0
+system "act migall" # -> 0
 
 use aliased 'Liberia::Action::BookAction';
 

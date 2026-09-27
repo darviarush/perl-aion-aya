@@ -1,7 +1,4 @@
-package Aion::Aya::Adapter::Diff::DDL;
-# DDL - отдельный класс, а не роль.
-# Он получает adapter в качестве сессии для запросов.
-# Имеет
+package Aion::Aya::Adapter::Diff::MemDiff;
 
 use common::sense;
 
@@ -17,8 +14,8 @@ sub diff :Isa(Me => HashRef[Table] => HashRef[Table] => ArrayRef[Str]) {
 
 }
 
-# Информация о таблицах в формате: table => Table
-sub structure {
+# Информация о таблицах из DBI для DBD::Mem
+sub structure :Isa(Me => HashRef[Table]) {
 	my ($self) = @_;
 	
 	my $dbh = $self->connect;

@@ -3,32 +3,36 @@ package Aion::Aya::Table;
 
 use common::sense;
 
+use List::Util qw//;
+
 use Aion;
 
-our %COLUMN = (
-	name => Str,
-	type => Str,
-	is_nullable => Bool,
-	default => Str,
-	options => Str,
-	comment => Str,
-	order => Num,
-);
-
 BEGIN {
+	my %COLUMN = (
+		name => Str,
+		type => Str,
+		is_nullable => Bool,
+		default => Str,
+		options => Str,
+		comment => Str,
+		order => Num,
+	);
+
+	subtype 'OptionColumn', as Dict[List::Util::pairmap { ($a => Option[$b]) } %COLUMN];
+	
 	subtype 'Column', as Dict[%COLUMN];
 
 	subtype 'Key', as Dict[
 		name => Str,
-		fields => ArrayRef[Str],
+		columns => ArrayRef[Str],
 		options => ArrayRef[Str],
 	];
 
 	subtype 'ForeignKey', as Dict[
 		name => Str,
-		to_class => PackageName,
-		fields => ArrayRef[Str],
-		to_fields => ArrayRef[Str],
+		to_table => PackageName,
+		columns => ArrayRef[Str],
+		to_columns => ArrayRef[Str],
 		options => ArrayRef[Str],
 	];
 }
@@ -39,11 +43,11 @@ has table => (is => 'ro+', isa => Str);
 # Опции таблицы в базе
 has options => (is => 'ro', isa => Undef|Str|ArrayLike|HashLike);
 
-# Столбцы. Используются только в миграции
-has columns => (is => 'rw', isa => ArrayRef[Column]);
-
 # Первичный ключ
-has primary_key => (is => 'rw', isa => Key);
+has primary_key => (is => 'ro+', isa => Key);
+
+# Столбцы
+has columns => (is => 'ro+', isa => ArrayRef[Column]);
 
 # Уникальные ключи
 has unique_keys => (is => 'ro', isa => ArrayRef[Key], lazy => 0, default => sub {+[]});

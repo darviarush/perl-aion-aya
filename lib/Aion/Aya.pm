@@ -5,6 +5,7 @@ use common::sense;
 our $VERSION = "0.0.0";
 
 use Aion::Aya::Model;
+use Aion::Aya::Table;
 
 use Aion -role, -export => [qw/presents primary_key unique_key index_key foreign_key memory_key fetch_key/];
 
@@ -92,8 +93,6 @@ aspect next => sub {
 	$META{$cls}->next($value);
 };
 
-my $Column = Dict([List::Util::pairmap { ($a => Option[$b]) } %Aion::Aya::Table::COLUMN]);
-
 # Объявляет поле таблицы
 aspect col => sub {
 	my ($value, $feature) = @_;
@@ -107,7 +106,7 @@ aspect col => sub {
 	$value = {} if $value eq 1;
 	
 	$value->{order} //= 1+keys %{$model->{column}};
-	$Column->validate($value, "$name/col");
+	Aion::Aya::Table->OptionColumn->validate($value, "$name/col");
 
 	my $col_name = $value->{name} // $name;
 
@@ -134,7 +133,7 @@ aspect ref => sub {
 	Dict([
 		ref_field => Option[Str],
 		bk_field => Option[Str],
-		col => Option[$Column],
+		col => Option[Aion::Aya::Table->OptionColumn],
 	])->validate($value, "$name/ref") if ref $value;
 	
 	my $ref_field = ref $value? $value->{ref_field} // 'id': 'id';
@@ -187,8 +186,10 @@ aspect bk => sub {
 # has x => (is => 'ro', isa => 'RefClass', m2m => {
 # 	table => 'table_name', # если не указана - имена таблиц через 2 с постфиксом _m2m
 #   options => [table_options],
-#   ref_field => '', # если не указан - id
-#   bk_field => '', # если не указан - id
+#   ref_field => '', # если не указан - id (поле в классе с m2m)
+#   bk_field => '', # если не указан - id (поле в классе из isa)
+#   ref_col => {name => ''}, # столбец промежуточной таблицы для класса с m2m, по умолчанию <таблица m2m>_id
+#   bk_col => {name => ''}, # столбец промежуточной таблицы для класса из isa, по умолчанию <таблица isa>_id
 # });
 aspect m2m => sub {
 	my ($value, $feature) = @_;
@@ -201,9 +202,11 @@ aspect m2m => sub {
 
 	Dict([
 		table => Option[Str],
-		options => Option[Any],
+		options => Option[ArrayRef[Str]],
 		ref_field => Option[Str],
 		bk_field => Option[Str],
+		ref_col => Option[Aion::Aya::Table->OptionColumn],
+		bk_col => Option[Aion::Aya::Table->OptionColumn],
 	])->validate($value, "$name/m2m") if ref $value;
 
 	my $ref_cls = Aion::Aya::Model->get_ref($feature);
@@ -216,10 +219,17 @@ aspect m2m => sub {
 	my $table = ref $value? $value->{table}: undef;
 	$table //= join('2', $model->{table}, $ref_model->{table}) . '_m2m';
 
-	my $m2m_table = Aion::Aya::Table->new(
-		table => $table,
-		options => ref $value? $value->{options}: undef,
-	);
+	# Столбцы промежуточной таблицы: слева — ссылка на класс с m2m, справа — на класс из isa
+	my $left_col  = ref $value? {%{ $value->{ref_col} // {} }}: {};
+	my $right_col = ref $value? {%{ $value->{bk_col} // {} }}: {};
+	$left_col->{name}  //= $model->{table} . '_id';
+	$right_col->{name} //= $ref_model->{table} . '_id';
+
+	my $m2m_table = {
+		left_col  => $left_col,
+		right_col => $right_col,
+		options   => ref $value? $value->{options} // []: [],
+	};
 
 	my $field = {
 		name => $name,

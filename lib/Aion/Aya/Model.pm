@@ -3,19 +3,28 @@ package Aion::Aya::Model;
 
 use common::sense;
 
-use aliased 'Aion::Aya::Table';
+use Aion::Aya::Table;
 
 use Aion;
 
-extends Table;
-
 BEGIN {
-	subtype 'Field', as Dict[
+	subtype 'PrimaryKey', as Dict[
+		fields => ArrayRef[Str],
+		options => ArrayRef[Str],
+	];
+
+	subtype 'Key', as Dict[
 		name => Str,
-		type => Enum[qw/col ref bk m2m/],
-		col_name => Option[Str], # столбец есть у col и ref. Описание его в column
-		ref => Option[Tuple[PackageName, Str, Maybe[Str]]], # ссылка на другую модель. Используется ref и bk
-		table => Option[Table], # для m2m связей – ссылка на промежуточную таблицу
+		fields => ArrayRef[Str],
+		options => ArrayRef[Str],
+	];
+
+	subtype 'ForeignKey', as Dict[
+		name => Str,
+		to_class => PackageName,
+		fields => ArrayRef[Str],
+		to_fields => ArrayRef[Str],
+		options => ArrayRef[Str],
 	];
 
 	subtype 'MemoryKey', as Dict[
@@ -25,6 +34,20 @@ BEGIN {
 
 	subtype 'FetchKey', as Dict[
 		fields => ArrayRef[Str],
+	];
+
+	subtype 'Table', as Dict[
+		left_col => Aion::Aya::Table->OptionColumn,
+		right_col => Aion::Aya::Table->OptionColumn,
+		options => ArrayRef[Str],
+	];
+	
+	subtype 'Field', as Dict[
+		name => Str,
+		type => Enum[qw/col ref bk m2m/],
+		col_name => Option[Str], # столбец есть у col и ref. Описание его в column
+		ref => Option[Tuple[PackageName, Str, Maybe[Str]]], # ссылка на другую модель. Используется ref и bk
+		table => Option[&Table], # для m2m связей – ссылка на промежуточную таблицу
 	];
 }
 
@@ -36,6 +59,24 @@ has next => (is => 'ro', isa => Object|Str|Undef);
 
 # Поля
 has field => (is => 'ro', isa => HashRef[Field]);
+
+# Имя таблицы в базе
+has table => (is => 'ro+', isa => Str);
+
+# Опции таблицы в базе
+has options => (is => 'ro', isa => Undef|Str|ArrayLike|HashLike);
+
+# Первичный ключ
+has primary_key => (is => 'rw', isa => PrimaryKey);
+
+# Уникальные ключи
+has unique_keys => (is => 'ro', isa => ArrayRef[Key], lazy => 0, default => sub {+[]});
+
+# Индексы
+has index_keys => (is => 'ro', isa => ArrayRef[Key], lazy => 0, default => sub {+[]});
+
+# Внешние ключи
+has foreign_keys => (is => 'ro', isa => ArrayRef[ForeignKey], lazy => 0, default => sub {+[]});
 
 # Индексы в кеше: field => Key
 has memory_key => (is => 'ro', isa => HashRef[MemoryKey], lazy => 0, default => sub {+[]});
