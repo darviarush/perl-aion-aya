@@ -28,38 +28,30 @@ sub presents(@) {
 
 # Если ключ - составной
 sub primary_key(@) {
-	my ($name, $fields, @options) = @_;
-	my $meta = $META{caller()};
-	die "Primary key is already installed!" if exists $meta->{primary_key};
-    $meta->primary_key({name => 'PRIMARY', fields => $fields, options => \@options});
+	my ($fields, @options) = @_;
+	$META{caller()}->add_primary_key($fields, +{@options});
 	return;
 }
 
 # Если ключ - составной
 sub unique_key(@) {
 	my ($name, $fields, @options) = @_;
-	my $meta = $META{caller()};
-	my $key = {name => $name, fields => $fields, options => \@options};
-	Aion::Aya::Model->Key->validate($key, "unique_key $name");
-	push @{$meta->{unique_keys}}, $key;
+	$META{caller()}->add_unique_key($name, $fields, +{@options});
+	return;
 }
 
 # Если ключ - составной
 sub index_key(@) {
 	my ($name, $fields, @options) = @_;
-	my $meta = $META{caller()};
-	my $key = {name => $name, fields => $fields, options => \@options};
-	Aion::Aya::Model->Key->validate($key, "index_key $name");
-	push @{$meta->{unique_keys}}, $key;
+	$META{caller()}->add_index_key($name, $fields, +{@options});
+	return;
 }
 
 # Если ключ - составной
 sub foreign_key(@) {
 	my ($name, $to_class, $fields, $to_fields, @options) = @_;
-	my $meta = $META{caller()};
-	my $key = {name => $name, to_class => $to_class, fields => $fields, to_fields => $to_fields, options => \@options};
-	Aion::Aya::Model->ForeignKey->validate($key, "foreign_key $name");
-	push @{$meta->{foreign_keys}}, $key;
+	$META{caller()}->add_foreign_key($name, $to_class, $fields, $to_fields, +{@options});
+	return;
 }
 
 # Часть строки с указанными полями будет хранится в таком ключе.
@@ -69,26 +61,15 @@ sub foreign_key(@) {
 # Если же поле не входит ни в один memory_key или fetch_key, то оно будет загружатся из базы в гордом одиночестве, что может понадобится для блобов и других объёмных полей
 sub memory_key(@) {
 	my ($key_format, $fields, @options) = @_;
-	my $meta = $META{caller()};
-	my $key = {key_format => $key_format, fields => $fields, options => \@options};
-	Aion::Aya::Model->MemoryKey->validate($key, "memory_key $key_format");
-	for my $field (@$fields) {
-		die "$key_format and $meta->{memory_key}{$_}{key_format} memory_keys use one field $field!" if exists $meta->{memory_key}{$_};
-		$meta->{memory_key}{$_} = $key;
-	}
+	$META{caller()}->add_memory_key($key_format, $fields, +{@options});
+	return;
 }
 
 # Когда поле будет запрошено из Entity, то оно загрузится вместе с другими полями в ключе, если эти поля отсутствуют в объекте
 sub fetch_key(@) {
 	my ($fields) = @_;
-	my $meta = $META{caller()};
-	my $name = join "-", @$fields;
-	my $key = {fields => $fields};
-	Aion::Aya::Model->FetchKey->validate($key, "fetch_key");
-	for my $field (@$fields) {
-		die "$name and $meta->{fetch_key}{$_}{name} fetch_keys use one field $field!" if exists $meta->{fetch_key}{$_};
-		$meta->{fetch_key}{$_} = $key;
-	}
+	$META{caller()}->add_fetch_key($fields);
+	return;
 }
 
 #@category Аспекты
@@ -96,7 +77,12 @@ sub fetch_key(@) {
 # Объявляет первичный ключ таблицы
 aspect pk => sub {
 	my ($value, $feature) = @_;
-	primary_key([$feature->name]);
+	my $cls = $feature->{cls};
+
+	my $col = $Aion::META{$cls}{aspect}{col};
+	$col->($value, $feature);
+	
+	$META{$cls}->add_primary_key([$feature->{name}]);
 };
 
 # Определяет генератор для создания идентификаторов
@@ -110,7 +96,7 @@ aspect next => sub {
 aspect col => sub {
 	my ($value, $feature) = @_;
 
-	Model->make_column_feature($feature);
+	Aion::Aya::Model->make_column_feature($feature);
 
 	my $cls = $feature->{cls};
 	my $model = $META{$cls};
@@ -118,7 +104,7 @@ aspect col => sub {
 
 	$value = {} if $value eq 1;
 	
-	Model->Column->validate($value, "$name/col");
+	Aion::Aya::Model->Column->validate($value, "$name/col");
 	$value->{order} //= 1+keys %{$model->{column}};
 
 	my $col_name = $value->{name} // $name;
@@ -129,7 +115,7 @@ aspect col => sub {
 		col_name => $col_name,
 	};
 
-	Model->Field->validate($field, "$name/col/field");
+	Aion::Aya::Model->Field->validate($field, "$name/col/field");
 	$model->{field}{$name} = $field;
 };
 
@@ -137,33 +123,36 @@ aspect col => sub {
 aspect ref => sub {
 	my ($value, $feature) = @_;
 
-	Model->make_column_feature($feature);
+	Aion::Aya::Model->make_column_feature($feature);
 
 	my $cls = $feature->{cls};
 	my $model = $META{$cls};
 	my $name = $feature->{name};
-	
+
 	Dict([
-		name_ref => Option[Str],
-		col => Option[Model->Column],
+		ref_field => Option[Str],
+		bk_field => Option[Str],
+		col => Option[Aion::Aya::Model->Column],
 	])->validate($value, "$name/ref") if ref $value;
 	
-	my $ref_field = $value eq 1? 'id': ref $value? $value->{ref_name} // 'id': $value =~ s/^-//;
+	my $ref_field = ref $value? $value->{ref_field} // 'id': 'id';
+
+	my $bk_field = $value eq 1? undef: ref $value? $value->{bk_field}: $value =~ s/^-//;
 	
 	my $col = ref $value? $value->{col} // {}: {};
 	$col->{order} //= 1+keys %{$model->{column}};
 
 	my $col_name = $value->{name} // "$name\_id";
-	my $ref = Model->get_ref($feature);
+	my $ref = Aion::Aya::Model->get_ref($feature);
 
 	my $field = {
 		name => $name,
 		type => 'ref',
 		col_name => $col_name,
-		ref => [$ref, $ref_field],
+		ref => [$ref, $ref_field, $bk_field],
 	};
 
-	Model->Field->validate($field, "$name/ref/field");
+	Aion::Aya::Model->Field->validate($field, "$name/ref/field");
 	$model->{field}{$name} = $field;
 };
 
@@ -171,31 +160,60 @@ aspect ref => sub {
 aspect bk => sub {
 	my ($value, $feature) = @_;
 
-	Model->make_column_feature($feature);
+	Aion::Aya::Model->make_column_feature($feature);
 
 	my $cls = $feature->{cls};
 	my $model = $META{$cls};
 	my $name = $feature->{name};
 
-	my $ref = Model->get_ref($feature);
+	my $ref = Aion::Aya::Model->get_ref($feature);
 	my $ref_field = $value =~ s/^-//r;
 
 	my $field = {
 		name => $name,
 		type => 'bk',
-		ref => [$ref, $ref_field],
+		ref => [$ref, $ref_field, undef],
 	};
 
-	Model->Field->validate($field, "$name/bk/field");
+	Aion::Aya::Model->Field->validate($field, "$name/bk/field");
 	$model->{field}{$name} = $field;
 };
 
 # Объявляет связь многие-ко-многим на другую таблицу
-aspect m2n => sub {
+aspect m2m => sub {
 	my ($value, $feature) = @_;
 
-	Model->make_column_feature($feature);
+	Aion::Aya::Model->make_column_feature($feature);
+
+	my $ref_cls = Aion::Aya::Model->get_ref($feature);
+
 	
+};
+
+#@category Аспекты для индексов
+
+# Делает поле уникальным
+aspect unique => sub {
+	my ($value, $feature) = @_;
+
+	my $name = $value eq 1
+		? $META{$feature->{cls}}->col_name($feature->{name}) . '_unx'
+		: $value =~ s/^-//r;
+
+	my $cls = $feature->{cls};
+	$META{$cls}->add_unique_key($name, [$feature->{name}]);
+};
+
+# Добавляет поисковый индекс на поле
+aspect index => sub {
+	my ($value, $feature) = @_;
+
+	my $name = $value eq 1
+		? $META{$feature->{cls}}->col_name($feature->{name}) . '_idx'
+		: $value =~ s/^-//r;
+	
+	my $cls = $feature->{cls};
+	$META{$cls}->add_index_key($name, [$feature->{name}]);
 };
 
 1;

@@ -14,7 +14,7 @@ BEGIN {
 		name => Str,
 		type => Enum[qw/col ref bk m2m n2m m2n/],
 		col_name => Option[Str], # столбец есть у col и ref. Описание его в column
-		ref => Option[Tuple[PackageName, Str]], # ссылка на другую модель. Используется ref и bk
+		ref => Option[Tuple[PackageName, Str, Maybe[Str]]], # ссылка на другую модель. Используется ref и bk
 		table => Option[Table], # для m2m связей – ссылка на промежуточную таблицу
 	];
 
@@ -72,7 +72,7 @@ sub col_name {
 
 # Возвращает
 sub get_ref {
-	my ($self, $feature) = @_;
+	my ($cls, $feature) = @_;
 
 	my $isa = $feature->{isa}{name} eq 'Maybe'? $feature->{isa}{args}[0]: $feature->{isa};
 
@@ -81,9 +81,81 @@ sub get_ref {
 	$isa->{args}[0]
 }
 
+# Добавляет основной ключ
+sub add_primary_key {
+	my ($self, $fields, $options) = @_;
+
+	die "Primary key is already installed!" if exists $self->{primary_key};
+    $self->primary_key({fields => $fields, options => $options});
+	
+	$self
+}
+
+# Добавляет уникальный ключ
+sub add_unique_key {
+	my ($self, $name, $fields, $options) = @_;
+
+	my $key = {name => $name, fields => $fields, options => $options};
+	Key->validate($key, "unique_key $name");
+	push @{$self->{unique_keys}}, $key;
+	
+	$self
+}
+
+# Добавляет мультипликативный ключ
+sub add_index_key {
+	my ($self, $name, $fields, $options) = @_;
+
+	my $key = {name => $name, fields => $fields, options => $options};
+	Key->validate($key, "index_key $name");
+	push @{$self->{index_keys}}, $key;
+	
+	$self
+}
+
+# Добавляет мультипликативный ключ
+sub add_foreign_key {
+	my ($self, $name, $to_class, $fields, $to_fields, $options) = @_;
+
+	my $key = {name => $name, to_class => $to_class, fields => $fields, to_fields => $to_fields, options => $options};
+	ForeignKey->validate($key, "foreign_key $name");
+	push @{$self->{foreign_keys}}, $key;
+	
+	$self
+}
+
+# Добавляет памятный ключ
+sub add_memory_key {
+	my ($self, $key_format, $fields, $options) = @_;
+
+	my $key = {key_format => $key_format, fields => $fields, options => $options};
+	MemoryKey->validate($key, "memory_key $key_format");
+	for my $field (@$fields) {
+		die "$key_format and $self->{memory_key}{$_}{key_format} memory_keys use one field $field!" if exists $self->{memory_key}{$_};
+		$self->{memory_key}{$_} = $key;
+	}
+	
+	$self
+}
+
+# Добавляет ключ извлечения связанных столбцов
+sub add_fetch_key {
+	my ($self, $fields) = @_;
+
+	my $name = join "-", @$fields;
+	my $key = {fields => $fields};
+	FetchKey->validate($key, "fetch_key");
+	for my $field (@$fields) {
+		die "$name and $self->{fetch_key}{$_}{name} fetch_keys use one field $field!" if exists $self->{fetch_key}{$_};
+		$self->{fetch_key}{$_} = $key;
+	}
+	
+	$self
+}
+
 # Создаёт триггеры на фиче
 sub make_column_feature {
-	my ($self, $feature) = @_;
+	my ($cls, $feature) = @_;
 	my $name = $feature->{name};
 	$feature->construct
 		->add_access("\$self->_appearance->fetch(\$self, '$name') unless exists \$self->{$name};")
