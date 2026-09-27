@@ -92,6 +92,8 @@ aspect next => sub {
 	$META{$cls}->next($value);
 };
 
+my $Column = Dict([List::Util::pairmap { ($a => Option[$b]) } %Aion::Aya::Table::COLUMN]);
+
 # Объявляет поле таблицы
 aspect col => sub {
 	my ($value, $feature) = @_;
@@ -104,8 +106,8 @@ aspect col => sub {
 
 	$value = {} if $value eq 1;
 	
-	Aion::Aya::Model->Column->validate($value, "$name/col");
 	$value->{order} //= 1+keys %{$model->{column}};
+	$Column->validate($value, "$name/col");
 
 	my $col_name = $value->{name} // $name;
 
@@ -132,7 +134,7 @@ aspect ref => sub {
 	Dict([
 		ref_field => Option[Str],
 		bk_field => Option[Str],
-		col => Option[Aion::Aya::Model->Column],
+		col => Option[$Column],
 	])->validate($value, "$name/ref") if ref $value;
 	
 	my $ref_field = ref $value? $value->{ref_field} // 'id': 'id';
@@ -191,26 +193,42 @@ aspect bk => sub {
 aspect m2m => sub {
 	my ($value, $feature) = @_;
 
+	Aion::Aya::Model->make_column_feature($feature);
+
 	my $cls = $feature->{cls};
 	my $model = $META{$cls};
 	my $name = $feature->{name};
-	
-	Aion::Aya::Model->make_column_feature($feature);
+
+	Dict([
+		table => Option[Str],
+		options => Option[Any],
+		ref_field => Option[Str],
+		bk_field => Option[Str],
+	])->validate($value, "$name/m2m") if ref $value;
 
 	my $ref_cls = Aion::Aya::Model->get_ref($feature);
+	my $ref_model = Aion::Aya::Model->get($ref_cls);
 
-	my $table = ...;
-	
-	my $m2m_table = Aion::Aya::Table->new(table => $table);
+	my $ref_field = ref $value? $value->{ref_field} // 'id': 'id';
+	my $bk_field = $value eq 1? undef: ref $value? $value->{bk_field}: $value =~ s/^-//;
+
+	# Промежуточная таблица: имя можно задать, иначе — имена таблиц через "2" с постфиксом _m2m
+	my $table = ref $value? $value->{table}: undef;
+	$table //= join('2', $model->{table}, $ref_model->{table}) . '_m2m';
+
+	my $m2m_table = Aion::Aya::Table->new(
+		table => $table,
+		options => ref $value? $value->{options}: undef,
+	);
 
 	my $field = {
 		name => $name,
 		type => 'm2m',
-		ref => [$ref, $ref_field, $bk_field],
+		ref => [$ref_cls, $ref_field, $bk_field],
 		table => $m2m_table,
 	};
 
-	Aion::Aya::Model->Field->validate($field, "$name/ref/field");
+	Aion::Aya::Model->Field->validate($field, "$name/m2m/field");
 	$model->{field}{$name} = $field;
 };
 
@@ -316,7 +334,7 @@ Aion::Aya - ORM
 	has coauthors => (
 		is => 'rw',
 		isa => ArrayRef[Author],
-		m2n => {table => -co_authors_books, ref => -cobooks});
+		m2m => {table => -co_authors_books, ref => -cobooks});
 	
 	1;
 

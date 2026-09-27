@@ -12,7 +12,7 @@ extends Table;
 BEGIN {
 	subtype 'Field', as Dict[
 		name => Str,
-		type => Enum[qw/col ref bk m2m n2m m2n/],
+		type => Enum[qw/col ref bk m2m/],
 		col_name => Option[Str], # столбец есть у col и ref. Описание его в column
 		ref => Option[Tuple[PackageName, Str, Maybe[Str]]], # ссылка на другую модель. Используется ref и bk
 		table => Option[Table], # для m2m связей – ссылка на промежуточную таблицу
@@ -162,23 +162,6 @@ sub make_column_feature {
 		->add_trigger("\$self->_appearance->store(\$self, '$name')")
 		->add_cleaner("\$self->_appearance->clear(\$self, '$name')")
 	;
-}
-
-sub _column_builder {
-	my ($self) = @_;
-
-	my $feature_href = $Aion::META{ref $self}{feature}; 
-	
-	for my $field (%{$self->{field}}) {
-		my $feature = $feature_href->{$field};
-		my $isa = $feature->{isa};
-		my $is_nullable = $isa->{name} eq 'Maybe'? do { $isa = $isa->{args}[0]; 1 }: 0;
-		my %column = (
-			name => $self->col_name(),
-			is_nullable => $is_nullable,
-		);
-	}
-	
 }
 
 1;

@@ -30,14 +30,16 @@ sub run {
 		}
 	0 };
 
-	my %struct_model = map { ($_->table => $_) } values %Aion::Aya::Model::META;
+	my %struct_model = map { $comparator->build_columns($_); ($_->table => $_) } values %Aion::Aya::Model::META;
 	
 	my @up = $comparator->diff(\%struct_model, $struct_database);
 	my @down = $comparator->diff($struct_database, \%struct_model);
 
 	die "Need TODO!";
 	# TODO:
-	# 1. 
+	# 1. Обернуть @up в инструкции миграции и сформировать функцию up
+	# 2. Обернуть @down в инструкции миграции и сформировать функцию down
+	# 3. Сформировать класс миграции и записать его через Aion::Fs lay в migrations/year4/month2/MigNum.pm
 }
 
 1;

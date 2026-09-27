@@ -70,7 +70,7 @@ has author => (is => 'rw', isa => Author, ref => -books);
 has coauthors => (
 	is => 'rw',
 	isa => ArrayRef[Author],
-	m2n => {table => -co_authors_books, ref => -cobooks});
+	m2m => {table => -co_authors_books, ref => -cobooks});
 
 1;
 ```
