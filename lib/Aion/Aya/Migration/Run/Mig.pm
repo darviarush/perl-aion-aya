@@ -3,7 +3,7 @@ package Aion::Aya::Migration::Run::Mig;
 
 use common::sense;
 
-use Aion::Aya::Migration::Type qw/MigNum/;
+use Aion::Aya::Migration::Types qw/MigNum MIGRATIONS_PATH/;
 
 use aliased 'Aion::Aya::Model';
 

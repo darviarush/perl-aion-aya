@@ -8,9 +8,22 @@ use common::sense; use open qw/:std :utf8/;  use Carp qw//; use Cwd qw//; use Fi
 # 
 # # SYNOPSIS
 # 
-# Файл .env:
-#@> .env
-#>> AION_AYA_CLIENT = Aion::Aya::Client::Memory
+# Файл etc/include.yml:
+#@> etc/include.yml
+#>> aion:
+#>>   eon:
+#>>     Aion::Aya::Appearance:
+#>>         argumens:
+#>>             adapter: "@aion.aya.adapter"
+#>>             cache: "@aion.aya.cache"
+#>> 
+#>>     aion.aya.adapter:
+#>>       class: Aion::Aya::Adapter::MemAdapter
+#>> 
+#>>     aion.aya.cache:
+#>>       class: CHI
+#>>       arguments:
+#>>         driver: None
 #@< EOF
 # 
 # Файл lib/Liberia/Storage/Author/Author.pm:
@@ -19,15 +32,13 @@ use common::sense; use open qw/:std :utf8/;  use Carp qw//; use Cwd qw//; use Fi
 #>> use common::sense;
 #>> use aliased 'Liberia::Storage::Book::Book';
 #>> 
-#>> use Aion;
-#>> 
-#>> with 'Aion::Aya';
+#>> use Aion with => 'Aion::Aya';
 #>> 
 #>> # Authors of the Liberia
 #>> presents 'authors';
 #>> 
 #>> # The identifier
-#>> has id => (is => 'ro', isa => Nat, pk => 1, next => -auto_increment);
+#>> has id => (is => 'ro', isa => Nat, pk => 1, next => -identity);
 #>> 
 #>> # Name of the author
 #>> has name => (is => 'ro', isa => NonEmptyStr, col => 1, unique => 1);
@@ -50,15 +61,13 @@ use common::sense; use open qw/:std :utf8/;  use Carp qw//; use Cwd qw//; use Fi
 #>> use common::sense;
 #>> use aliased 'Liberia::Storage::Author::Author';
 #>> 
-#>> use Aion;
-#>> 
-#>> with 'Aion::Aya';
+#>> use Aion with => 'Aion::Aya';
 #>> 
 #>> # Books of the Liberia
 #>> presents 'books';
 #>> 
 #>> # The identifier
-#>> has id => (is => 'ro', isa => Nat, pk => 1, next => -auto_increment);
+#>> has id => (is => 'ro', isa => Nat, pk => 1, next => -identity);
 #>> 
 #>> # Name of a book
 #>> has title => (is => 'rw', isa => NonEmptyStr, col => 1, unique => 1);
@@ -81,24 +90,22 @@ use common::sense; use open qw/:std :utf8/;  use Carp qw//; use Cwd qw//; use Fi
 #>> use common::sense;
 #>> use aliased 'Liberia::Storage::Book::Book';
 #>> 
-#>> use Aion;
-#>> 
-#>> with 'Aion::Aya::Box';
+#>> use Aion with => 'Aion::Aya::Box';
 #>> 
 #>> box_for Book;
 #>> 
 #>> sub all {
 #>> 	my ($self) = @_;
 #>> 
-#>> 	@{$self->query_builder}
+#>> 	$self->query_builder->iter_or_array;
 #>> }
 #>> 
 #>> sub get_title_on_P {
 #>> 	my ($self) = @_;
 #>> 
 #>> 	$self->query_builder
-#>> 		->join(author => 'a')
-#>> 		->filter(F"a.name" =~ 'P%' | F"a.name" =~ qr/^P/)
+#>> 		->left_join(author => -a)
+#>> 		->filter(a__name__like => 'P%')
 #>> 		->scalar(-title);
 #>> }
 #>> 
@@ -157,6 +164,15 @@ use common::sense; use open qw/:std :utf8/;  use Carp qw//; use Cwd qw//; use Fi
 subtest 'SYNOPSIS' => sub { 
 use common::sense;
 
+# aion-scan собирает аннотации проекта в etc/annotation/, в т.ч. описания команд #@run
+# (aya:migration:mkmig и aya:migration:migall) в etc/annotation/run.ann.
+local ($::_g0 = do {system "aion-scan"}, $::_e0 = do {0}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'system "aion-scan" # -> 0' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+# act mkmig берёт команду aya:migration:mkmig из etc/annotation/run.ann, сравнивает модели
+# с текущей структурой базы и создаёт файл миграции migrations/<год>/<месяц>/Migration<MigNum>.pm.
+local ($::_g0 = do {system "act mkmig"}, $::_e0 = do {0}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'system "act mkmig" # -> 0' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+# act migall накатывает все созданные миграции (вызывает up у каждой).
+local ($::_g0 = do {system "act migall"}, $::_e0 = do {0}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'system "act migall" # -> 0' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
 use aliased 'Liberia::Action::BookAction';
 
 my $book_action = BookAction->new;
@@ -165,11 +181,15 @@ local ($::_g0 = do {scalar $book_action->list}, $::_e0 = do {1}); ::ok defined($
 local ($::_g0 = do {$book_action->title}, $::_e0 = "On the edge of Enchanted Wood, a green oak stands"); ::ok $::_g0 eq $::_e0, '$book_action->title # => On the edge of Enchanted Wood, a green oak stands' or ::diag ::_string_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
 # 
+# К:`aion-scan` — это `/ext/__/@lib/perl-aion-annotation/script/aion-scan`. Она собирает аннотации из модулей проекта в файлы `etc/annotation/*.ann`. В частности, из аннотаций `#@run` (в `MkMig` и `MigAll`) формируется `etc/annotation/run.ann`, откуда утилита `act` (`/ext/__/@lib/perl-aion-run/script/act`) узнаёт о командах `mkmig` и `migall` и может их запустить.
+# 
+# `act mkmig` — сравнивает модели (`presents`, `col`, `ref`, `m2m` и т.д.) с текущей структурой базы и создаёт файл миграции. `act migall` — накатывает (или откатывает при `-d`) все созданные миграции. Обе команды пишут миграции в `AION_MIGRATIONS_PATH` (по умолчанию `migrations`) в виде `migrations/{год}/{месяц}/Migration{Номер}.pm`.
+# 
 # # DESCRIPTION
 # 
 # `Aion::Aya` — это ORM который реализует паттерны **Единица работы** и **Шлюз к данным таблицы**.
 # 
-# ORM использует идеи `Doctrine` и `Hibernate` через **Менеджер сущностей** и .
+# ORM использует идеи `Doctrine` и `Hibernate`.
 # 
 # 1. **Identity Map** (Карта идентичности)
 #    *Суть:* Кэш первого уровня.

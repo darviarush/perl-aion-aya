@@ -10,50 +10,175 @@ extends 'Aion::Aya::Adapter::Diff::Abstract';
 
 # Сравнивает два списка таблиц, возвращает инструкции DQL, которые нужно выполнить, чтобы привести к 1-й
 sub diff :Isa(Me => HashRef[Table] => HashRef[Table] => ArrayRef[Str]) {
-	my ($self, @models) = @_;
+	my ($self, $models, $database) = @_;
 
+	my @ddl;
+	for my $table (sort keys %$models) {
+		push @ddl, $self->show_create_table($models->{$table}) unless exists $database->{$table};
+	}
+	for my $table (sort keys %$database) {
+		push @ddl, $self->show_drop_table($database->{$table}) unless exists $models->{$table};
+	}
+
+	# TODO: alter table add column, drop column, add index, etc
+	
+	\@ddl;
 }
 
-# Информация о таблицах из DBI для DBD::Mem
+# Заполняет таблицу на основе модели
+sub model2table :Isa(Me => Model => Table) {
+	my ($self, $model) = @_;
+	
+	my $cls = $model->{pkg};
+	
+	my $feature_href = $Aion::META{$cls}{feature};
+
+	my @columns;
+	for my $field (sort { $a->{col}{order} <=> $b->{col}{order} } grep { $_->{col} } values %{$model->{field}}) {
+		my $name = $field->{name};
+		my $feature = $feature_href->{$name};
+		my $isa = $feature->{isa};
+		my $is_nullable = $isa->{name} eq 'Maybe'? do { $isa = $isa->{args}[0]; 1 }: 0;
+
+		my $col = $field->{col};
+		
+		push @columns, {
+			name => $col->{name},
+			type => $col->{type} // $self->isa2type($isa),
+			is_nullable => $col->{is_nullable} // $feature->{isa}{name} eq 'Maybe',
+			default => $col->{default} // '',
+			options => [], # В DBD::Mem нет опций
+			comment => '', # В DBD::Mem нет комментариев
+			order => $field->{order},
+		};
+	}
+
+	my $pk = $model->primary_key;
+	my @pk_columns = $pk? map { $model->col_name($_) } @{$pk->{fields}}: ();
+
+	Table->new(
+		table => $model->table,
+		primary_key => {columns => \@pk_columns, options => $pk? $pk->{options} // []: []},
+		columns => \@columns,
+	);
+}
+
+# Информация о таблицах из DBD::Mem
 sub structure :Isa(Me => HashRef[Table]) {
 	my ($self) = @_;
-	
-	my $dbh = $self->connect;
-	my $tables_sth = $dbh->table_info(undef, undef, '%', 'TABLE');
-
-	my %table_row;
-	while (my $row = $tables_sth->fetchrow_hashref) {
-		my $table = $row->{TABLE_NAME};
-		$table_row{$table} = $row;
-	}
-
-	$tables_sth->finish;
 
 	my %table;
-	for my $table (keys %table_row) {
-		
-		my $column_sth = $dbh->column_info(undef, undef, $row->{TABLE_NAME}, '%');
-		
-		while (my $col = $column_sth->fetchrow_hashref) {
-		    print "Колонка: " . $col->{COLUMN_NAME} . "\n";
-		    print "  Тип данных: " . $col->{TYPE_NAME} . "\n";
-		    print "  Размер:     " . $col->{COLUMN_SIZE} . "\n";
-		}
-	
-		$column_sth->finish;
 
-		$table{$table} = Table->new(table => $table, column => , );
+	for my $table ($self->get_tables) {
+		my @columns = $self->get_columns;
+		$table{$table} = Table->new(
+			table => $table,
+			primary_key => {columns => ['id'], options => []},
+			columns => \@columns,
+		);
 	}
-	
-	$self->finish($dbh);
 
 	\%table
 }
 
-# 
+our %DATA_TYPE = (
+	TinyInt => 'tinyint',
+	LongInt => 'int',
+	Int => 'int',
+);
+
+sub isa_name2type {
+	my ($self, $isa) = @_;
+
+	if($isa->is_intersection) {
+		# TODO: в типах Aion ограничения длины указываются так: Str & Len[10], соответственно нужно получить из этого varchar(10)
+		# Num => double
+		# Double => double
+		# Float => float
+		# Int => int
+		# PositiveInt => int unsigned
+		# Str или Uni => varchar(255)
+		# Bin => binary(255)
+		# 
+		my ($len) = grep { $_->{name} eq 'Len' } @{$isa->{args}};
+		if($len) {}
+	}
+	
+	$DATA_TYPE{$isa->{name}} // die "Not convert isa $isa to type!"
+}
+
+# Получает таблицы из базы
+sub get_tables {
+	my ($self) = @_;
+	my @tables;
+	my $dbh = $self->adapter->connect;
+	my $sth_tables = $dbh->table_info(undef, undef, undef, 'TABLE');
+	while (my $row = $sth_tables->fetchrow_hashref) {
+		push @tables, $row->{TABLE_NAME};
+	}
+	$sth_tables->finish;
+	$self->adapter->finish($dbh);
+	@tables
+}
+
+# Получает столбцы таблицы из базы
+sub get_columns {
+	my ($self, $table) = @_;
+	my @columns;
+	my $order = 0;
+	my $dbh = $self->adapter->connect;
+	my $sth_columns = $dbh->column_info(undef, undef, $table, undef);
+	while(my $col = $sth_columns->fetchrow_hashref) {
+		my $is_nullable = defined $col->{IS_NULLABLE} && $col->{IS_NULLABLE} eq 'YES';
+		push @columns, {
+			name => $col->{COLUMN_NAME},
+			type => $col->{TYPE_NAME},
+			is_nullable => $is_nullable,
+			default => $col->{COLUMN_DEF}, # Используем SQL::Statement, который поддерживаеи ANSI-SQL типизацию
+			options => '', # DBD::Mem не поддерживает autoincrement и т.п.
+			comment => '', # DBD::Mem не поддерживает комментарии
+			order => $order++,
+		};
+	}
+	$sth_columns->finish;
+	$self->adapter->finish($dbh);
+	@columns
+}
+
+# Возвращает индексы из SQL::Statement
+sub get_indexes {
+	my ($self, $table) = @_;
+
+	my $dbh = $self->adapter->connect;
+
+	my $sth_pk = $dbh->primary_key_info(undef, undef, $table);
+	my @pk_columns; my %pk_columns;
+	while(my $row = $sth_pk->fetchrow_hashref) {
+		push @pk_columns, $row->{COLUMN_NAME};
+		$pk_columns{$row->{COLUMN_NAME}} = 1;
+	}
+	
+	# Запрашиваем информацию об индексах для таблицы
+	# Передаем: $catalog, $schema, $table, $unique_only, $quick
+	my $sth_indexes = $dbh->statistics_info(undef, undef, $table, 0, 0);
+	
+    while (my $index = $sth_indexes->fetchrow_hashref) {
+        next if defined $index->{TYPE} && $index->{TYPE} == 0; # Пропускаем статистику таблицы
+        next if $pk_columns{$index->{COLUMN_NAME}}; # Пропускаем, если это уже PK
+        #$idx_fields{$i->{COLUMN_NAME}} = $i->{INDEX_NAME};
+        # TODO: дописать
+    }
+
+	$sth_indexes->finish;
+	$self->adapter->finish($dbh);
+
+	# TODO: дописать return
+}
+
+# Имя поля или таблицы
 sub word {
 	my ($self, $word) = @_;
-	$self->adapter->word($word);
+	$self->adapter->transformator->word($word);
 }
 
 #@category DDL базы
@@ -86,221 +211,99 @@ sub show_modify_database {
 
 #@category DDL таблиц
 
-# устанавливает OTHER
-sub set_other {
-	my $self = shift;
-	$self->{OTHER} = [@_];
-	$self
-}
-
-# опции таблицы
+# опции таблицы в DBD::Mem не поддерживаются
 sub show_definition_table {
 	my ($self, $tab, $create) = @_;
-	
-	join " ",
-		defined($tab->autoincrement)? "AUTO_INCREMENT=" . $tab->autoincrement: (),
-		defined($tab->charset)? 
-			($create? "DEFAULT": "CONVERT TO",
-			"CHARACTER SET", $self->quote($tab->charset), "COLLATE", $self->quote($tab->collation)): (),
-		defined($tab->engine)? "ENGINE=" . $tab->engine: (),
-		defined($tab->autoincrement)? "AUTO_INCREMENT=" . $tab->autoincrement: (),
-		defined($tab->options)? $tab->options: (),
-		defined($tab->comment)? $self->COMMENT($tab->comment, "tab"): (),
+	'';
 }
 
 # внутренности таблицы
 sub show_create_definition {
 	my ($self, $tab) = @_;
+
+	my @pk = @{$tab->primary_key->{columns} // []};
+
 	join(",\n",
 		(map { $self->show_column($_, 1) } @{$tab->columns}),
-		(map { $self->show_index($_) } @{$tab->indexes}),
-		(map { $self->show_foreign($_) } @{$tab->foreigns}),
+		(@pk? 'PRIMARY KEY (' . join(', ', map { $self->word($_) } @pk) . ')': ()),
+		(map { $self->show_index($_) } @{$tab->unique_keys}, @{$tab->index_keys}),
+		(map { $self->show_foreign($_) } @{$tab->foreign_keys}),
 	);
 }
 
 # создать таблицу
 sub show_create_table {
 	my ($self, $tab) = @_;
-	return
-		join("", "CREATE TABLE ", $self->word($tab->name), " (\n", $self->show_create_definition($tab), "\n) ", $self->show_definition_table($tab, 1)),
-		@{$self->{OTHER}};
+	join '', "CREATE TABLE ", $self->word($tab->table), " (\n", $self->show_create_definition($tab), "\n)";
 }
 
 # модифицировать опции таблицы
 sub show_modify_table {
 	my ($self, $tab) = @_;
-	join "", "ALTER TABLE ", $self->word($tab->name), " ", $self->show_definition_table($tab);
+	join '', "ALTER TABLE ", $self->word($tab->table), " ", $self->show_definition_table($tab);
 }
 
 # переименовать таблицу
 sub show_rename_table {
 	my ($self, $tab, $to) = @_;
-	join "", "ALTER TABLE ", $self->word($tab->name), " RENAME TO ", $self->word($to);
+	join '', "ALTER TABLE ", $self->word($tab->table), " RENAME TO ", $self->word($to);
 }
 
 # удалить таблицу
 sub show_drop_table {
 	my ($self, $tab) = @_;
-	join "", "DROP TABLE ", $self->word($tab->name);
+	join '', "DROP TABLE ", $self->word($tab->table);
 }
 
-# удалить таблицу
+# очистить таблицу
 sub show_truncate_table {
 	my ($self, $tab) = @_;
-	join "", "TRUNCATE TABLE ", $self->word($tab->name);
+	join '', "DELETE FROM ", $self->word($tab->table);
 }
-
 
 #@category DDL столбцов
 
-
-# возвращает колумн из info без названия столбца
+# определение столбца без названия (col — хеш Aion::Aya::Table->Column)
 sub show_definition_column {
 	my ($self, $col, $with_keys) = @_;
-	join " ", $col->type,
-		$with_keys? (
-			$col->null || $col->pk? (): "NOT NULL",
-		): (
-			$col->null? (): "NOT NULL",
-		),
-		defined($col->default)? ("DEFAULT ", $self->quote($col->default)): (),
-		$with_keys? (
-			$col->pk? "PRIMARY KEY": (),
-			$col->autoincrement? $self->AUTO_INCREMENT: (),
-		): (),
-		#$sql->{extra} ne ""? uc " $sql->{extra}": (),
-		defined($col->comment)? $self->COMMENT($col->comment, "col"): (),
-	;
+
+	join ' ', $col->{type} || 'TEXT',
+		defined($col->{is_nullable}) && !$col->{is_nullable}? 'NOT NULL': (),
+		defined($col->{default}) && $col->{default} ne ''? ('DEFAULT', $self->word($col->{default})): (),
+		$col->{options}? $col->{options}: ();
 }
 
 # столбец с названием
 sub show_column {
 	my ($self, $col, $with_keys) = @_;
-	join " ", $self->word($col->name), $self->show_definition_column($col, $with_keys)
+	join ' ', $self->word($col->{name}), $self->show_definition_column($col, $with_keys);
 }
-
-# создать столбец
-sub show_create_column {
-	my ($self, $col, $after) = @_;
-	join "", "ALTER TABLE ", $self->word($col->tab), " ADD COLUMN ", 
-		$self->show_column($col),
-		$self->show_after_column($after)
-}
-
-# изменить столбец
-sub show_modify_column {
-	my ($self, $col, $after) = @_;
-	join "", "ALTER TABLE ", $self->word($col->tab), " MODIFY COLUMN ", 
-		$self->show_column($col),
-		$self->show_after_column($after)
-}
-
-# после
-sub show_after_column {
-	my ($self, $after) = @_;
-	return "" if !defined $after;
-	return " FIRST" if $after == 1;
-	join "", " AFTER ", $self->word(ref $after? $after->name: $after)
-}
-
-# переименовать столбец
-sub show_rename_column {
-	my ($self, $col, $to) = @_;
-	join "", "ALTER TABLE ", $self->word($col->tab), " CHANGE ", $self->word($col->name), " ", $self->word($to), " ", $self->show_definition_column($col->clone->load);
-}
-
-# удалить столбец
-sub show_drop_column {
-	my ($self, $col) = @_;
-	join "", "ALTER TABLE ", $self->word($col->tab), " DROP ", $self->word($col->name);
-}
-
 
 #@category DDL индексов
 
-
-
-# формирует индекс без его названия
+# формирует индекс без его названия (idx — хеш Aion::Aya::Table->Key)
 sub show_definition_index {
 	my ($self, $idx) = @_;
-	join "", "(", join(", ", map { $self->word($_) } @{$idx->cols}), ")",
-		defined($idx->comment)? (" ", $self->COMMENT($idx->comment, "idx")): ();
+	join '', '(', join(', ', map { $self->word($_) } @{$idx->{columns}}), ')';
 }
 
 # индекс c типом и названием
 sub show_index {
 	my ($self, $idx) = @_;
-	join "", $idx->type, ($idx->type ne "INDEX"? " KEY": ()), " ", $self->word($idx->name), " ", $self->show_definition_index($idx);
+	join '', 'KEY ', $self->word($idx->{name}), ' ', $self->show_definition_index($idx);
 }
 
-# формирует индекс из info
-sub show_create_index {
-	my ($self, $idx) = @_;
-	join "", "ALTER TABLE ", $self->word($idx->tab), " ADD ", $self->show_index($idx)
-}
-
-# изменяет индекс
-sub show_modify_index {
-	my ($self, $idx) = @_;	
-	join "", $self->show_drop_index($idx), ", ADD ", $self->show_index($idx->clone->upd);
-}
-
-# переименовывает индекс
-sub show_rename_index {
-	my ($self, $idx, $to) = @_;
-	$to = $idx->clone->name($to) if !ref $to;
-	join "", $self->show_drop_index($idx), ", ADD ", $self->show_index($to->clone->upd);
-}
-
-# удалить индекс
-sub show_drop_index {
-	my ($self, $idx) = @_;
-	join "", "ALTER TABLE ", $self->word($idx->tab), " DROP INDEX ", $self->word($idx->name)
-}
-
-
-#@category DDL ссылок
-
-# формирует индекс без его названия
+# формирует ссылку без названия (fk — хеш Aion::Aya::Table->ForeignKey)
 sub show_definition_foreign {
 	my ($self, $fk) = @_;
-	join "", "FOREIGN KEY (", join(", ", map { $self->word($_) } @{$fk->cols}), ") REFERENCES ",
-		$self->word($fk->ref_tab), " (", join(", ", map { $self->word($_) } @{$fk->refs}), ")",
-		defined($fk->on_update)? (" ON UPDATE ", $fk->on_update): (),
-		defined($fk->on_delete)? (" ON DELETE ", $fk->on_delete): ();
+	join '', 'FOREIGN KEY (', join(', ', map { $self->word($_) } @{$fk->{columns}}), ') REFERENCES ',
+		$self->word($fk->{to_table}), ' (', join(', ', map { $self->word($_) } @{$fk->{to_columns}}), ')';
 }
 
-# индекс c типом и названием
+# ссылка c названием
 sub show_foreign {
 	my ($self, $fk) = @_;
-	join "", "CONSTRAINT ", $self->word($fk->name), " ", $self->show_definition_foreign($fk);
-}
-
-# создаёт ссылку
-sub show_create_foreign {
-	my ($self, $fk) = @_;
-	join "", "ALTER TABLE ", $self->word($fk->tab), " ADD ", $self->show_foreign($fk)
-}
-
-# модифицирует
-sub show_modify_foreign {
-	my ($self, $fk) = @_;
-	return $self->show_drop_foreign($fk), 
-		$self->show_create_foreign($fk);
-	#join "", "ALTER TABLE ", $self->word($fk->tab), " DROP FOREIGN KEY ", $self->word($fk->name), "; ", ", ADD ", $self->show_foreign($fk)
-}
-
-# переименовывает fk
-sub show_rename_foreign {
-	my ($self, $fk, $to) = @_;
-	$to = $fk->clone->name($to) if !ref $to;
-	join "", "ALTER TABLE ", $self->word($fk->tab), " DROP FOREIGN KEY ", $self->word($fk->name), ", ADD ", $self->show_foreign($to)
-}
-
-# удаляет ссылку
-sub show_drop_foreign {
-	my ($self, $fk) = @_;
-	join "", "ALTER TABLE ", $self->word($fk->tab), " DROP FOREIGN KEY ", $self->word($fk->name)
+	join '', 'CONSTRAINT ', $self->word($fk->{name}), ' ', $self->show_definition_foreign($fk);
 }
 
 1;

@@ -3,7 +3,8 @@ package Aion::Aya::Migration::Run::MigAll;
 
 use common::sense;
 
-use Aion::Aya::Migration::Type qw/MigNum/;
+use Aion::Aya::Migration::Types qw/MigNum MIGRATIONS_PATH/;
+use Aion::Fs qw/find/;
 
 use aliased 'Aion::Aya::Model';
 
@@ -21,14 +22,39 @@ has migration => (is => 'ro', isa => Maybe[MigNum], arg => 1);
 sub run {
 	my ($self) = @_;
 
-	require ...;
-	
-	if($self->down) {	
-		# Накатить все миграции, которые ещё не были накачены до указанной
+	# Пути миграций в порядке возрастания номера
+	my @paths = sort find MIGRATIONS_PATH, '*.pm';
+	my @pkg = map { _pkg($_) } @paths;
+
+	# До какого номера выполнять (включительно)
+	my $upto = defined $self->migration? "Migration${\$self->migration}": undef;
+
+	if($self->down) {
+		# Откатываем накатанные миграции от старших к младшим до указанной
+		for my $i (reverse 0..$#paths) {
+			my $pkg = $pkg[$i] // next;
+			next if defined $upto && $pkg le $upto;
+			require "./$paths[$i]";
+			$pkg->new->down;
+		}
 	}
 	else {
-		# Откатить все накачанные миграции до указанной
+		# Накатываем миграции от младших к старшим до указанной
+		for my $i (0..$#paths) {
+			my $pkg = $pkg[$i] // next;
+			next if defined $upto && $pkg gt $upto;
+			require "./$paths[$i]";
+			$pkg->new->up;
+		}
 	}
+
+	$self
+}
+
+# Имя пакета миграции по пути к её файлу
+sub _pkg {
+	my ($path) = @_;
+	$path =~ m{/(Migration\d+)\.pm\z}? $1: undef;
 }
 
 1;

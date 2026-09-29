@@ -164,8 +164,13 @@ sub title {
 ```perl
 use common::sense;
 
+# aion-scan собирает аннотации проекта в etc/annotation/, в т.ч. описания команд #@run
+# (aya:migration:mkmig и aya:migration:migall) в etc/annotation/run.ann.
 system "aion-scan" # -> 0
+# act mkmig берёт команду aya:migration:mkmig из etc/annotation/run.ann, сравнивает модели
+# с текущей структурой базы и создаёт файл миграции migrations/<год>/<месяц>/Migration<MigNum>.pm.
 system "act mkmig" # -> 0
+# act migall накатывает все созданные миграции (вызывает up у каждой).
 system "act migall" # -> 0
 
 use aliased 'Liberia::Action::BookAction';
@@ -196,6 +201,12 @@ ORM использует идеи `Doctrine` и `Hibernate`.
    *Реализация:* Настройки через атрибуты/аннотации в коде, XML-файлы или YAML-конфигурации.
 5. **Identity Field** (Поле идентичности)
    *Суть:* Обязательное наличие у каждого сохраняемого объекта уникального идентификатора (первичного ключа), который связывает объект в памяти со строкой в таблице.
+
+Используемые команды:
+
+* `aion-scan` собирает аннотации из модулей проекта в файлы `etc/annotation/*.ann`. В частности, из аннотаций `#@run` (в `MkMig` и `MigAll`) формируется `etc/annotation/run.ann`, откуда утилита `act` узнаёт о командах `mkmig` и `migall` и может их запустить.
+* `act mkmig` — сравнивает модели (`presents`, `col`, `ref`, `m2m` и т.д.) с текущей структурой базы и создаёт файл миграции.
+* `act migall` — накатывает (или откатывает при `-d`) все созданные миграции. Обе команды пишут миграции в `AION_MIGRATIONS_PATH` (по умолчанию `migrations`) в виде `migrations/{год}/{месяц}/Migration{Номер}.pm`.
 
 # SUBROUTINES
 

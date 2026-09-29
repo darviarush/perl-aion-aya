@@ -13,7 +13,7 @@ use Aion -role, -export => [qw/presents primary_key unique_key index_key foreign
 our %META;
 
 # Менеджер сущностей
-has _appearance => (is => 'ro', isa => Maybe['Aion::Aya::Appearance'], eon => 1);
+has _appearance => (is => 'ro', isa => 'Aion::Aya::Appearance', eon => 1);
 
 #@category Таблица
 
@@ -103,17 +103,18 @@ aspect col => sub {
 	my $model = $META{$cls};
 	my $name = $feature->{name};
 
-	$value = {} if $value eq 1;
+	my $col = $value eq 1? {}: ref $value? {%$value}: {name => $value =~ s/^-//};
 	
-	$value->{order} //= 1+keys %{$model->{column}};
+	$col->{order} //= 1+keys %{$model->{column}};
+	$col->{name} //= $name;
+	
 	Aion::Aya::Table->OptionColumn->validate($value, "$name/col");
 
-	my $col_name = $value->{name} // $name;
 
 	my $field = {
 		name => $name,
 		type => 'col',
-		col_name => $col_name,
+		col => $col,
 	};
 
 	Aion::Aya::Model->Field->validate($field, "$name/col/field");
@@ -140,16 +141,16 @@ aspect ref => sub {
 
 	my $bk_field = $value eq 1? undef: ref $value? $value->{bk_field}: $value =~ s/^-//;
 	
+	my $ref = Aion::Aya::Model->get_ref($feature);
+
 	my $col = ref $value? $value->{col} // {}: {};
 	$col->{order} //= 1+keys %{$model->{column}};
-
-	my $col_name = $value->{name} // "$name\_id";
-	my $ref = Aion::Aya::Model->get_ref($feature);
+	$col->{name} //= "$name\_id";
 
 	my $field = {
 		name => $name,
 		type => 'ref',
-		col_name => $col_name,
+		col => $col,
 		ref => [$ref, $ref_field, $bk_field],
 	};
 
@@ -284,9 +285,22 @@ Aion::Aya - ORM
 
 =head1 SYNOPSIS
 
-Файл .env:
+Файл etc/include.yml:
 
-	AION_AYA_CLIENT = Aion::Aya::Client::Memory
+	aion:
+	  eon:
+	    Aion::Aya::Appearance:
+	        argumens:
+	            adapter: "@aion.aya.adapter"
+	            cache: "@aion.aya.cache"
+	
+	    aion.aya.adapter:
+	      class: Aion::Aya::Adapter::MemAdapter
+	
+	    aion.aya.cache:
+	      class: CHI
+	      arguments:
+	        driver: None
 
 Файл lib/Liberia/Storage/Author/Author.pm:
 
@@ -294,15 +308,13 @@ Aion::Aya - ORM
 	use common::sense;
 	use aliased 'Liberia::Storage::Book::Book';
 	
-	use Aion;
-	
-	with 'Aion::Aya';
+	use Aion with => 'Aion::Aya';
 	
 	# Authors of the Liberia
 	presents 'authors';
 	
 	# The identifier
-	has id => (is => 'ro', isa => Nat, pk => 1, next => -auto_increment);
+	has id => (is => 'ro', isa => Nat, pk => 1, next => -identity);
 	
 	# Name of the author
 	has name => (is => 'ro', isa => NonEmptyStr, col => 1, unique => 1);
@@ -324,15 +336,13 @@ Aion::Aya - ORM
 	use common::sense;
 	use aliased 'Liberia::Storage::Author::Author';
 	
-	use Aion;
-	
-	with 'Aion::Aya';
+	use Aion with => 'Aion::Aya';
 	
 	# Books of the Liberia
 	presents 'books';
 	
 	# The identifier
-	has id => (is => 'ro', isa => Nat, pk => 1, next => -auto_increment);
+	has id => (is => 'ro', isa => Nat, pk => 1, next => -identity);
 	
 	# Name of a book
 	has title => (is => 'rw', isa => NonEmptyStr, col => 1, unique => 1);
@@ -354,24 +364,22 @@ Aion::Aya - ORM
 	use common::sense;
 	use aliased 'Liberia::Storage::Book::Book';
 	
-	use Aion;
-	
-	with 'Aion::Aya::Box';
+	use Aion with => 'Aion::Aya::Box';
 	
 	box_for Book;
 	
 	sub all {
 		my ($self) = @_;
 	
-		@{$self->query_builder}
+		$self->query_builder->iter_or_array;
 	}
 	
 	sub get_title_on_P {
 		my ($self) = @_;
 	
 		$self->query_builder
-			->join(author => 'a')
-			->filter(F"a.name" =~ 'P%' | F"a.name" =~ qr/^P/)
+			->left_join(author => -a)
+			->filter(a__name__like => 'P%')
 			->scalar(-title);
 	}
 	
@@ -428,6 +436,15 @@ Aion::Aya - ORM
 
 	use common::sense;
 	
+	# aion-scan собирает аннотации проекта в etc/annotation/, в т.ч. описания команд #@run
+	# (aya:migration:mkmig и aya:migration:migall) в etc/annotation/run.ann.
+	system "aion-scan" # -> 0
+	# act mkmig берёт команду aya:migration:mkmig из etc/annotation/run.ann, сравнивает модели
+	# с текущей структурой базы и создаёт файл миграции migrations/<год>/<месяц>/Migration<MigNum>.pm.
+	system "act mkmig" # -> 0
+	# act migall накатывает все созданные миграции (вызывает up у каждой).
+	system "act migall" # -> 0
+	
 	use aliased 'Liberia::Action::BookAction';
 	
 	my $book_action = BookAction->new;
@@ -435,11 +452,15 @@ Aion::Aya - ORM
 	scalar $book_action->list # -> 1
 	$book_action->title # => On the edge of Enchanted Wood, a green oak stands
 
+К:C<aion-scan> — это C</ext/__/@lib/perl-aion-annotation/script/aion-scan>. Она собирает аннотации из модулей проекта в файлы C<etc/annotation/*.ann>. В частности, из аннотаций C<#@run> (в C<MkMig> и C<MigAll>) формируется C<etc/annotation/run.ann>, откуда утилита C<act> (C</ext/__/@lib/perl-aion-run/script/act>) узнаёт о командах C<mkmig> и C<migall> и может их запустить.
+
+C<act mkmig> — сравнивает модели (C<presents>, C<col>, C<ref>, C<m2m> и т.д.) с текущей структурой базы и создаёт файл миграции. C<act migall> — накатывает (или откатывает при C<-d>) все созданные миграции. Обе команды пишут миграции в C<AION_MIGRATIONS_PATH> (по умолчанию C<migrations>) в виде C<migrations/{год}/{месяц}/Migration{Номер}.pm>.
+
 =head1 DESCRIPTION
 
 C<Aion::Aya> — это ORM который реализует паттерны B<Единица работы> и B<Шлюз к данным таблицы>.
 
-ORM использует идеи C<Doctrine> и C<Hibernate> через B<Менеджер сущностей> и .
+ORM использует идеи C<Doctrine> и C<Hibernate>.
 
 =over
 

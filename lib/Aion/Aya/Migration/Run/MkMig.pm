@@ -3,8 +3,10 @@ package Aion::Aya::Migration::Run::MkMig;
 
 use common::sense;
 
-use Aion::Aya::Migration::Type qw/MigNum/;
-use Aion::Fs qw/cat lay find to_pkg/;
+use POSIX qw/strftime/;
+
+use Aion::Aya::Migration::Types qw/MigNum MIGRATIONS_PATH/;
+use Aion::Fs qw/cat lay find mkpath to_pkg/;
 
 use aliased 'Aion::Aya::Model';
 
@@ -35,44 +37,58 @@ sub run {
 	find "lib", "*.pm", sub {
 		if(cat =~ /^use\s*Aion\s[^;]*\bAion::Aya[^:a-zA-Z_]/) {
 			my $pkg = to_pkg;
-			require $pkg unless $pkg ~~ ClassName;
+			require $pkg unless $pkg->can('new');
 		}
 	0 };
 
-	my %struct_model = map { ($_->table => $comparator->model2table($_)) } values %Aion::Aya::Model::META;
+	my %struct_model = map { ($_->table => $comparator->model2table($_)) } values %Aion::Aya::META;
 
 	my @up = $comparator->diff(\%struct_model, $struct_database);
 	my @down = $comparator->diff($struct_database, \%struct_model);
 
-	die "Need TODO!";
-	# TODO:
-	# 1. Обернуть @up в инструкции миграции и сформировать функцию up
-	# 2. Обернуть @down в инструкции миграции и сформировать функцию down
-	# 3. Сформировать класс миграции и записать его через Aion::Fs lay в migrations/year{4}/month{2}/Migration{MigNum}.pm. migrations взять из Aion::Env AION_MIGRATIONS_PATH => (default => 'migrations');
-	# 4. В классе миграции должен быть указан адаптор с ключом из свойства adaptor этой команды. Если он совпадает с 'Aion::Aya::Adaptor', то eon => 1.
-	# 
-	# Пример класса миграции:
-	# package Migration20260927221733;
-	#
-	# use common::sense;
-	# 
-	# use Aion;
-	#
-	# has adaptor => (is => 'ro', isa => 'Aion::Aya::Adaptor', eon => 1);
-	#
-	# sub up {
-	# 	my ($self) = @_;
-	# 	
-	# 	$self->adaptor->do(q{CREATE TABLE ...});
-	# }
-	# 
-	# sub down {
-	# 	my ($self) = @_;
-	# 	
-	# 	$self->adaptor->do(q{DROP TABLE ...});
-	# }
-	#
-	# 1;
+	# Номер миграции и путь к файлу миграции
+	my $mig_num = strftime "%Y%m%d%H%M%S", localtime;
+	my ($year, $month) = $mig_num =~ /^(\d{4})(\d{2})/;
+	my $pkg = "Migration$mig_num";
+	my $path = join '/', MIGRATIONS_PATH, $year, $month, "$pkg.pm";
+
+	# Класс миграции: адаптор берётся по ключу из свойства adapter команды
+	my $adaptor = $self->adapter;
+	my $up = join '', map { "\tq{$_},\n" } @up;
+	my $down = join '', map { "\tq{$_},\n" } @down;
+
+	my $code = <<"END";
+package $pkg;
+
+use common::sense;
+
+use Aion;
+
+has adaptor => (is => 'ro', isa => Object['$adaptor'], eon => 1);
+
+sub up {
+	my (\$self) = \@_;
+	my \$dbh = \$self->adaptor->connect;
+	\$self->adaptor->do(\$dbh, \$_) for (
+$up	);
+	\$self->adaptor->finish(\$dbh);
+}
+
+sub down {
+	my (\$self) = \@_;
+	my \$dbh = \$self->adaptor->connect;
+	\$self->adaptor->do(\$dbh, \$_) for (
+$down	);
+	\$self->adaptor->finish(\$dbh);
+}
+
+1;
+END
+
+	mkpath $path;
+	lay $path, $code;
+
+	$self
 }
 
 1;

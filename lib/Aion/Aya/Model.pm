@@ -45,7 +45,7 @@ BEGIN {
 	subtype 'Field', as Dict[
 		name => Str,
 		type => Enum[qw/col ref bk m2m/],
-		col_name => Option[Str], # столбец есть у col и ref. Описание его в column
+		col => Option[Aion::Aya::Table->OptionColumn], # столбец есть у col и ref. Описание его в column
 		ref => Option[Tuple[PackageName, Str, Maybe[Str]]], # ссылка на другую модель. Используется ref и bk
 		table => Option[&Table], # для m2m связей – ссылка на промежуточную таблицу
 	];
@@ -107,8 +107,10 @@ sub cols {
 # Возвращает имя столбца по полю
 sub col_name {
 	my ($self, $field) = @_;
+
+	my $fld = $self->{field}{$field};
 	
-	$self->{field}{$field}{col_name} // die "$field have'nt column!";
+	$fld && $fld->{col}	&& $fld->{col}{name} or die "$field have'nt column!";
 }
 
 # Возвращает
