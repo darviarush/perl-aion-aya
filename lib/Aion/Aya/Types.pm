@@ -8,7 +8,7 @@ use Aion::Types;
 use Exporter qw/import/;
 
 our @EXPORT = our @EXPORT_OK = grep {
-	*{$Aion::Types::{$_}}{CODE}	&& !/^(_|(NaN|import|all|any|looks_like_number|reftype|blessed|prototype|set_prototype|subname|set_subname)\z)/n
+	*{$Aion::Types::{$_}}{CODE}	&& !/^(_|(NaN|import)\z)/n
 } keys %Aion::Types::;
 
 BEGIN {
