@@ -24,10 +24,10 @@ sub run {
 
 	# Пути миграций в порядке возрастания номера
 	my @paths = sort find MIGRATIONS_PATH, '*.pm';
-	my @pkg = map { _pkg($_) } @paths;
+	my @pkg = map { /(Migration\d+)\.pm\z/ && $1 } @paths;
 
 	# До какого номера выполнять (включительно)
-	my $upto = defined $self->migration? "Migration${\$self->migration}": undef;
+	my $upto = defined $self->{migration}? "Migration$self->{migration}": undef;
 
 	if($self->down) {
 		# Откатываем накатанные миграции от старших к младшим до указанной
@@ -49,12 +49,6 @@ sub run {
 	}
 
 	$self
-}
-
-# Имя пакета миграции по пути к её файлу
-sub _pkg {
-	my ($path) = @_;
-	$path =~ m{/(Migration\d+)\.pm\z}? $1: undef;
 }
 
 1;

@@ -4,6 +4,7 @@ package Aion::Aya::Types;
 use common::sense;
 
 use Aion::Aya::QueryBuilder;
+use Aion::Aya::Model;
 use Aion::Types;
 use Exporter qw/import/;
 
@@ -20,10 +21,13 @@ BEGIN {
 	coerce &Entity, from Str, via {
 		my $appearance = Aion->pleroma->resolve(B // 'Aion::Aya::Appearance');
 
+		my $pkey = Aion::Aya::Model->get(A)->{primary_key};
+		my $pk = $pkey->{fields}[0];
+
 		my $qb = Aion::Aya::QueryBuilder->new(
 			_appearance => $appearance,
 			_from => A,
-		)->filter(id => $_);
+		)->filter($pk => $_);
 	
 		$qb->first // $_
 	};

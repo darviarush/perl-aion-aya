@@ -95,6 +95,12 @@ sub finish {
 	$self
 }
 
+# Порождает итератор для сырого запроса
+sub raw_iterator :Isa(Me => Str => Object[Iterator]) {
+	my ($self, $sql) = @_;
+	Iterator->new(adapter => $self, session => { sql => $sql });
+}
+
 # Порождает итератор
 sub iterator :Isa(Me => Object[Query] => Object[Iterator]) {
 	my ($self, $query) = @_;
@@ -107,14 +113,17 @@ sub next :Isa(Me => HashRef => Any) {
 
 	$session->{dbh} //= $self->connect;
 	$session->{sth} //= do {
-		my $query = $self->transformator->transform($session->{query});
+		my $query = $session->{sql} // $self->transformator->transform($session->{query});
 		$self->prepare($session->{dbh}, $query);
 	};
 
 	my $row = $this->fetchrow($session->{sth});
 	if(defined $row) {
-		my $class = $self->_entity_class($session->{query}, $row);
-		$class->new(%$row);
+		if($session->{sql}) { $row }
+		else {
+			my $class = $self->_entity_class($session->{query}, $row);
+			$class->new(%$row);
+		}
 	} else {
 		$session->{sth}->finish;
 		$self->finish($dbh);

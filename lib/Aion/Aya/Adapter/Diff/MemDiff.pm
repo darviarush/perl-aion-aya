@@ -41,7 +41,7 @@ sub model2table :Isa(Me => Model => Table) {
 		my $is_nullable = $isa->{name} eq 'Maybe'? do { $isa = $isa->{args}[0]; 1 }: 0;
 
 		my $col = $field->{col};
-		
+
 		push @columns, {
 			name => $col->{name},
 			type => $col->{type} // $self->isa2type($isa),
@@ -87,7 +87,7 @@ our %DATA_TYPE = (
 	Int => 'int',
 );
 
-sub isa_name2type {
+sub isa2type {
 	my ($self, $isa) = @_;
 
 	if($isa->is_intersection) {

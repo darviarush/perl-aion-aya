@@ -53,33 +53,32 @@ sub run {
 	my $path = join '/', MIGRATIONS_PATH, $year, $month, "$pkg.pm";
 
 	# Класс миграции: адаптор берётся по ключу из свойства adapter команды
-	my $adaptor = $self->adapter;
-	my $up = join '', map { "\tq{$_},\n" } @up;
-	my $down = join '', map { "\tq{$_},\n" } @down;
+	my $adapter_eon_key = $self->adapter eq 'Aion::Aya::Adapter'? 1: $self->adapter;
+	my $up = join '', map { "\t\$self->add_sql(q{$_});\n" } @up;
+	my $down = join '', map { "\t\$self->add_sql(q{$_});\n" } @down;
 
 	my $code = <<"END";
 package $pkg;
+# 
 
 use common::sense;
 
 use Aion;
 
-has adaptor => (is => 'ro', isa => Object['$adaptor'], eon => 1);
+extends 'Aion::Aya::Migration';
+
+has adapter => (is => 'ro', isa => Object['Aion::Aya::Adapter'], eon => $adapter_eon_key);
 
 sub up {
 	my (\$self) = \@_;
-	my \$dbh = \$self->adaptor->connect;
-	\$self->adaptor->do(\$dbh, \$_) for (
-$up	);
-	\$self->adaptor->finish(\$dbh);
+
+$up
 }
 
 sub down {
 	my (\$self) = \@_;
-	my \$dbh = \$self->adaptor->connect;
-	\$self->adaptor->do(\$dbh, \$_) for (
-$down	);
-	\$self->adaptor->finish(\$dbh);
+
+$down
 }
 
 1;

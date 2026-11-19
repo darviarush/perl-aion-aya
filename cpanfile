@@ -30,9 +30,6 @@ on 'test' => sub {
 	requires 'Term::ANSIColor';
 	requires 'Test::More';
 	requires 'open';
-
-	requires 'DBD::Mem';
-	requires 'SQL::Statement';
 };
 
 recomendation 'DBD::MariaDB';
@@ -42,3 +39,5 @@ requires 'Aion';
 requires 'CHI';
 requires 'common::sense';
 requires 'DBI';
+requires 'DBD::Mem';
+requires 'SQL::Statement';
