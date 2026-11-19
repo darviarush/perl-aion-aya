@@ -181,10 +181,6 @@ local ($::_g0 = do {scalar $book_action->list}, $::_e0 = do {1}); ::ok defined($
 local ($::_g0 = do {$book_action->title}, $::_e0 = "On the edge of Enchanted Wood, a green oak stands"); ::ok $::_g0 eq $::_e0, '$book_action->title # => On the edge of Enchanted Wood, a green oak stands' or ::diag ::_string_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
 # 
-# К:`aion-scan` — это `/ext/__/@lib/perl-aion-annotation/script/aion-scan`. Она собирает аннотации из модулей проекта в файлы `etc/annotation/*.ann`. В частности, из аннотаций `#@run` (в `MkMig` и `MigAll`) формируется `etc/annotation/run.ann`, откуда утилита `act` (`/ext/__/@lib/perl-aion-run/script/act`) узнаёт о командах `mkmig` и `migall` и может их запустить.
-# 
-# `act mkmig` — сравнивает модели (`presents`, `col`, `ref`, `m2m` и т.д.) с текущей структурой базы и создаёт файл миграции. `act migall` — накатывает (или откатывает при `-d`) все созданные миграции. Обе команды пишут миграции в `AION_MIGRATIONS_PATH` (по умолчанию `migrations`) в виде `migrations/{год}/{месяц}/Migration{Номер}.pm`.
-# 
 # # DESCRIPTION
 # 
 # `Aion::Aya` — это ORM который реализует паттерны **Единица работы** и **Шлюз к данным таблицы**.
@@ -205,6 +201,12 @@ local ($::_g0 = do {$book_action->title}, $::_e0 = "On the edge of Enchanted Woo
 #    *Реализация:* Настройки через атрибуты/аннотации в коде, XML-файлы или YAML-конфигурации.
 # 5. **Identity Field** (Поле идентичности)
 #    *Суть:* Обязательное наличие у каждого сохраняемого объекта уникального идентификатора (первичного ключа), который связывает объект в памяти со строкой в таблице.
+# 
+# Используемые команды:
+# 
+# * `aion-scan` собирает аннотации из модулей проекта в файлы `etc/annotation/*.ann`. В частности, из аннотаций `#@run` (в `MkMig` и `MigAll`) формируется `etc/annotation/run.ann`, откуда утилита `act` узнаёт о командах `mkmig` и `migall` и может их запустить.
+# * `act mkmig` — сравнивает модели (`presents`, `col`, `ref`, `m2m` и т.д.) с текущей структурой базы и создаёт файл миграции.
+# * `act migall` — накатывает (или откатывает при `-d`) все созданные миграции. Обе команды пишут миграции в `AION_MIGRATIONS_PATH` (по умолчанию `migrations`) в виде `migrations/{год}/{месяц}/Migration{Номер}.pm`.
 # 
 # # SUBROUTINES
 # 

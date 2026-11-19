@@ -452,10 +452,6 @@ Aion::Aya - ORM
 	scalar $book_action->list # -> 1
 	$book_action->title # => On the edge of Enchanted Wood, a green oak stands
 
-К:C<aion-scan> — это C</ext/__/@lib/perl-aion-annotation/script/aion-scan>. Она собирает аннотации из модулей проекта в файлы C<etc/annotation/*.ann>. В частности, из аннотаций C<#@run> (в C<MkMig> и C<MigAll>) формируется C<etc/annotation/run.ann>, откуда утилита C<act> (C</ext/__/@lib/perl-aion-run/script/act>) узнаёт о командах C<mkmig> и C<migall> и может их запустить.
-
-C<act mkmig> — сравнивает модели (C<presents>, C<col>, C<ref>, C<m2m> и т.д.) с текущей структурой базы и создаёт файл миграции. C<act migall> — накатывает (или откатывает при C<-d>) все созданные миграции. Обе команды пишут миграции в C<AION_MIGRATIONS_PATH> (по умолчанию C<migrations>) в виде C<migrations/{год}/{месяц}/Migration{Номер}.pm>.
-
 =head1 DESCRIPTION
 
 C<Aion::Aya> — это ORM который реализует паттерны B<Единица работы> и B<Шлюз к данным таблицы>.
@@ -482,6 +478,18 @@ I<Реализация:> Настройки через атрибуты/анно
 
 =item 5. B<Identity Field> (Поле идентичности)
 I<Суть:> Обязательное наличие у каждого сохраняемого объекта уникального идентификатора (первичного ключа), который связывает объект в памяти со строкой в таблице.
+
+=back
+
+Используемые команды:
+
+=over
+
+=item * C<aion-scan> собирает аннотации из модулей проекта в файлы C<etc/annotation/*.ann>. В частности, из аннотаций C<#@run> (в C<MkMig> и C<MigAll>) формируется C<etc/annotation/run.ann>, откуда утилита C<act> узнаёт о командах C<mkmig> и C<migall> и может их запустить.
+
+=item * C<act mkmig> — сравнивает модели (C<presents>, C<col>, C<ref>, C<m2m> и т.д.) с текущей структурой базы и создаёт файл миграции.
+
+=item * C<act migall> — накатывает (или откатывает при C<-d>) все созданные миграции. Обе команды пишут миграции в C<AION_MIGRATIONS_PATH> (по умолчанию C<migrations>) в виде C<migrations/{год}/{месяц}/Migration{Номер}.pm>.
 
 =back
 

@@ -1,0 +1,72 @@
+msgid "Aion::Aya::Transaction - транзакция для Aion::Aya"
+msgstr "Aion::Aya::Transaction - transaction for Aion::Aya"
+
+msgid "Файл etc/include.yml:"
+msgstr "etc/include.yml file:"
+
+msgid "`Aion::Aya::Transaction` — это транзакция базы данных, привязанная к текущему волокну (`Coro`). В одном волокне одновременно может быть только одна активная транзакция."
+msgstr "`Aion::Aya::Transaction` is a database transaction bound to the current fiber (`Coro`). There can only be one active transaction on a single fiber at a time."
+
+msgid "Транзакция объявляется у менеджера сущностей (`Aion::Aya::Appearance`). Пока она жива, все обращения к базе в текущем волокне (fiber) входят в неё. Её нужно завершить вызовом `commit` или `rollback`. Если переменная с транзакцией уйдёт из области видимости без `commit`, автоматически сработает `rollback`."
+msgstr "The transaction is declared in the entity manager (`Aion::Aya::Appearance`). While it is alive, all calls to the database in the current fiber are included in it. It must be completed with a call to `commit` or `rollback`. If a variable with a transaction leaves the scope without `commit`, `rollback` will automatically trigger."
+
+msgid "Транзакция связана со своим адаптером: при создании она вызывает у адаптера `begin_transaction($self)`, и адаптер запоминает её под адресом текущего волокна. Все соединения (`DBH`), которые будут открыты в этом волокне во время жизни транзакции, добавляются в неё — так что `commit`/`rollback` распространяется на всю работу внутри транзакции."
+msgstr "A transaction is associated with its adapter: when created, it calls `begin_transaction($self)` on the adapter, and the adapter stores it under the address of the current fiber. All connections (`DBH`) that will be open in this fiber during the lifetime of the transaction are added to it - so that `commit`/`rollback` applies to all work within the transaction."
+
+msgid "Открыть транзакцию:"
+msgstr "Open transaction:"
+
+msgid "Выполнить нужную работу — например, сохранить несколько объектов (всё это происходит именно в пределах транзакции):"
+msgstr "Do the necessary work - for example, save several objects (all this happens within the transaction):"
+
+msgid "Зафиксировать изменения, если всё прошло успешно:"
+msgstr "Commit changes if everything went well:"
+
+msgid "Либо отменить изменения:"
+msgstr "Or cancel the changes:"
+
+msgid "По умолчанию у `Aion::Aya::Appearance` подключён адаптер через контейнер эонов (`Aion::Pleroma`), например in‑memory драйвер. Транзакция использует именно адаптер менеджера сущностей, из которого была получена."
+msgstr "By default, `Aion::Aya::Appearance` has an adapter connected through the eons container (`Aion::Pleroma`), for example an in‑memory driver. The transaction uses exactly the entity manager adapter from which it was received."
+
+msgid "Дальше показаны две типовые сценария: **успешное сохранение** (с `commit`) и **откат** (с `rollback`)."
+msgstr "Below are two typical scenarios: **successful save** (with `commit`) and **rollback** (with `rollback`)."
+
+msgid "Пусть есть сущность автора с первичным ключом и автоинкрементом:"
+msgstr "Let there be an author entity with a primary key and auto-increment:"
+
+msgid "Файл lib/Liberia/Storage/Author/Author.pm:"
+msgstr "File lib/Liberia/Storage/Author/Author.pm:"
+
+msgid "И его репозиторий:"
+msgstr "And its repository:"
+
+msgid "Файл lib/Liberia/Storage/Author/AuthorBox.pm:"
+msgstr "File lib/Liberia/Storage/Author/AuthorBox.pm:"
+
+msgid "Завершает транзакцию, фиксируя её (`commit` всех открытых соединений) и извлекая её из состояния адаптера."
+msgstr "Completes a transaction by committing it (`commit` all open connections) and removing it from the adapter state."
+
+msgid "Завершает транзакцию, откатывая её (`rollback` всех открытых соединений)."
+msgstr "Completes a transaction by rolling it back (`rollback` of all open connections)."
+
+msgid "Если переменную, хранящую транзакцию, не закоммитить, то при уничтожении она вызовет `rollback`:"
+msgstr "If the variable storing the transaction is not committed, then when destroyed it will cause `rollback`:"
+
+msgid "Транзакция открытая в внутри другой вызовет исключение:"
+msgstr "A transaction opened inside another will throw an exception:"
+
+msgid ""
+"* Транзакция привязана к текущему волокну; не переносите её в другое волокно.\n"
+"* В одном волокне единовременно открыта только одна транзакция — вторая попытка `begin_transaction` для того же волокна вызовет исключение.\n"
+"* Завершать транзакцию стоит явно (`commit`/`rollback`); полагаться на автоматический откат при выходе из области видимости допустимо, но лучше не затягивать транзакцию."
+msgstr ""
+"* The transaction is tied to the current fiber; do not transfer it to another fiber.\n"
+"* Only one transaction is open at a time in one fiber - a second attempt to `begin_transaction` on the same fiber will throw an exception.\n"
+"* The transaction should be completed explicitly (`commit`/`rollback`); Relying on automatic rollback when leaving scope is acceptable, but it is better not to delay the transaction."
+
+msgid "⚖ **Perl5**"
+msgstr "⚖ **Perl5**"
+
+msgid "The Aion::Aya module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+msgstr "The Aion::Aya module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+

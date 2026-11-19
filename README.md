@@ -181,10 +181,6 @@ scalar $book_action->list # -> 1
 $book_action->title # => On the edge of Enchanted Wood, a green oak stands
 ```
 
-К:`aion-scan` — это `/ext/__/@lib/perl-aion-annotation/script/aion-scan`. Она собирает аннотации из модулей проекта в файлы `etc/annotation/*.ann`. В частности, из аннотаций `#@run` (в `MkMig` и `MigAll`) формируется `etc/annotation/run.ann`, откуда утилита `act` (`/ext/__/@lib/perl-aion-run/script/act`) узнаёт о командах `mkmig` и `migall` и может их запустить.
-
-`act mkmig` — сравнивает модели (`presents`, `col`, `ref`, `m2m` и т.д.) с текущей структурой базы и создаёт файл миграции. `act migall` — накатывает (или откатывает при `-d`) все созданные миграции. Обе команды пишут миграции в `AION_MIGRATIONS_PATH` (по умолчанию `migrations`) в виде `migrations/{год}/{месяц}/Migration{Номер}.pm`.
-
 # DESCRIPTION
 
 `Aion::Aya` — это ORM который реализует паттерны **Единица работы** и **Шлюз к данным таблицы**.
@@ -205,6 +201,12 @@ ORM использует идеи `Doctrine` и `Hibernate`.
    *Реализация:* Настройки через атрибуты/аннотации в коде, XML-файлы или YAML-конфигурации.
 5. **Identity Field** (Поле идентичности)
    *Суть:* Обязательное наличие у каждого сохраняемого объекта уникального идентификатора (первичного ключа), который связывает объект в памяти со строкой в таблице.
+
+Используемые команды:
+
+* `aion-scan` собирает аннотации из модулей проекта в файлы `etc/annotation/*.ann`. В частности, из аннотаций `#@run` (в `MkMig` и `MigAll`) формируется `etc/annotation/run.ann`, откуда утилита `act` узнаёт о командах `mkmig` и `migall` и может их запустить.
+* `act mkmig` — сравнивает модели (`presents`, `col`, `ref`, `m2m` и т.д.) с текущей структурой базы и создаёт файл миграции.
+* `act migall` — накатывает (или откатывает при `-d`) все созданные миграции. Обе команды пишут миграции в `AION_MIGRATIONS_PATH` (по умолчанию `migrations`) в виде `migrations/{год}/{месяц}/Migration{Номер}.pm`.
 
 # SUBROUTINES
 
