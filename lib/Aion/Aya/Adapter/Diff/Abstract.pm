@@ -1,4 +1,5 @@
 package Aion::Aya::Adapter::Diff::Abstract;
+# Сравнивают entity с таблицей в базе для создания миграции
 
 use common::sense;
 

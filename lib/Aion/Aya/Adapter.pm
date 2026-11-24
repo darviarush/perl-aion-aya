@@ -3,34 +3,17 @@ package Aion::Aya::Adapter;
 
 use common::sense;
 
+use aliased 'Aion::Aya::Adapter::Transform::Abstract' => 'Transform';
 use aliased 'Aion::Aya::Query';
 use aliased 'Aion::Aya::Iterator';
 use aliased 'Aion::Aya::Model';
 
 use Aion -role;
 
-# Класс для сравнения модели и структуры базы
-req diff_class => (is => 'ro', isa => PackageName);
+# Трансформирует запрос в DML базы. Конкретный диалект задаёт драйвер (Transform::Mysql, ...)
+req transformator => (is => 'ro', isa => Transform);
 
-# Трансформирует запрос в промежуточное представление (например, SQL или структуру у Elastic)
-req transformator => (is => 'ro', isa => 'Aion::Aya::Adapter::Transform::Abstract');
-
-# Возвращает класс для сравнения модели и структуры базы
-has comparator => (is => 'ro', isa => '', default => sub {
-	my ($self) = @_;
-
-	my $class = $self->diff_class . '.pm';
-	$class =~ s!::!/!g;
-	require $class;
-
-	$class->new(adapter => $self);
-}
-
-
-req dsn => (is => 'ro', isa => Str);
-req login => (is => 'ro', isa => Maybe[Str]);
-req password => (is => 'ro', isa => Maybe[Str]);
-req attr => (is => 'ro', isa => HashRef);
+# dsn, login, password и attr объявляет реализация соединений — роль Iterator::DBI
 
 # Порождает итератор
 sub iterator :Isa(Me => Object[Query] => Object[Iterator]);
@@ -42,7 +25,7 @@ sub next :Isa(Me => Hashref => Any);
 sub execute :Isa(Me => Object[Query] => PositiveInt);
 
 # Для получения следующего идентификатора
-sub next_val :Isa(Me => Object[Aion::Aya] => Str);
+sub next_val :Isa(Me => Object['Aion::Aya'] => Str);
 
 # Сгенерированные прокси-классы сущностей: базовый класс => набор алиасов => имя класса
 my %PROXY;

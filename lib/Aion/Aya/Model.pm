@@ -79,10 +79,10 @@ has index_keys => (is => 'ro', isa => ArrayRef[Key], lazy => 0, default => sub {
 has foreign_keys => (is => 'ro', isa => ArrayRef[ForeignKey], lazy => 0, default => sub {+[]});
 
 # Индексы в кеше: field => Key
-has memory_key => (is => 'ro', isa => HashRef[MemoryKey], lazy => 0, default => sub {+[]});
+has memory_key => (is => 'ro', isa => HashRef[MemoryKey], lazy => 0, default => sub {+{}});
 
 # Индексы для загрузки нескольких полей из базы, если затронут только один
-has fetch_key => (is => 'ro', isa => HashRef[FetchKey], lazy => 0, default => sub {+[]});
+has fetch_key => (is => 'ro', isa => HashRef[FetchKey], lazy => 0, default => sub {+{}});
 
 # Вернуть модель по классу или объекту
 sub get {
@@ -129,7 +129,7 @@ sub add_primary_key {
 	my ($self, $fields, $options) = @_;
 
 	die "Primary key is already installed!" if exists $self->{primary_key};
-    $self->primary_key({fields => $fields, options => $options});
+	$self->primary_key({fields => $fields, options => $options // []});
 	
 	$self
 }

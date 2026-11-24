@@ -78,9 +78,9 @@ sub fetch_key(@) {
 # Объявляет первичный ключ таблицы
 aspect pk => sub {
 	my ($value, $feature) = @_;
-	my $cls = $feature->{cls};
+	my $cls = $feature->{pkg};
 
-	my $col = $Aion::META{$cls}{aspect}{col};
+	my $col = $Aion::META{'Aion::Aya'}{aspect}{col};
 	$col->($value, $feature);
 	
 	$META{$cls}->add_primary_key([$feature->{name}]);
@@ -89,7 +89,7 @@ aspect pk => sub {
 # Определяет генератор для создания идентификаторов
 aspect next => sub {
 	my ($value, $feature) = @_;
-	my $cls = $feature->{cls};
+	my $cls = $feature->{pkg};
 	$META{$cls}->next($value);
 };
 
@@ -99,7 +99,7 @@ aspect col => sub {
 
 	Aion::Aya::Model->make_column_feature($feature);
 
-	my $cls = $feature->{cls};
+	my $cls = $feature->{pkg};
 	my $model = $META{$cls};
 	my $name = $feature->{name};
 
@@ -108,7 +108,7 @@ aspect col => sub {
 	$col->{order} //= 1+keys %{$model->{column}};
 	$col->{name} //= $name;
 	
-	Aion::Aya::Table->OptionColumn->validate($value, "$name/col");
+	Aion::Aya::Table->OptionColumn->validate($col, "$name/col");
 
 
 	my $field = {
@@ -127,7 +127,7 @@ aspect ref => sub {
 
 	Aion::Aya::Model->make_column_feature($feature);
 
-	my $cls = $feature->{cls};
+	my $cls = $feature->{pkg};
 	my $model = $META{$cls};
 	my $name = $feature->{name};
 
@@ -164,7 +164,7 @@ aspect bk => sub {
 
 	Aion::Aya::Model->make_column_feature($feature);
 
-	my $cls = $feature->{cls};
+	my $cls = $feature->{pkg};
 	my $model = $META{$cls};
 	my $name = $feature->{name};
 
@@ -197,7 +197,7 @@ aspect m2m => sub {
 
 	Aion::Aya::Model->make_column_feature($feature);
 
-	my $cls = $feature->{cls};
+	my $cls = $feature->{pkg};
 	my $model = $META{$cls};
 	my $name = $feature->{name};
 
@@ -250,10 +250,10 @@ aspect unique => sub {
 	my ($value, $feature) = @_;
 
 	my $name = $value eq 1
-		? $META{$feature->{cls}}->col_name($feature->{name}) . '_unx'
+		? $META{$feature->{pkg}}->col_name($feature->{name}) . '_unx'
 		: $value =~ s/^-//r;
 
-	my $cls = $feature->{cls};
+	my $cls = $feature->{pkg};
 	$META{$cls}->add_unique_key($name, [$feature->{name}]);
 };
 
@@ -262,10 +262,10 @@ aspect index => sub {
 	my ($value, $feature) = @_;
 
 	my $name = $value eq 1
-		? $META{$feature->{cls}}->col_name($feature->{name}) . '_idx'
+		? $META{$feature->{pkg}}->col_name($feature->{name}) . '_idx'
 		: $value =~ s/^-//r;
 	
-	my $cls = $feature->{cls};
+	my $cls = $feature->{pkg};
 	$META{$cls}->add_index_key($name, [$feature->{name}]);
 };
 

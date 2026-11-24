@@ -4,9 +4,14 @@ use common::sense;
 
 use Coro qw//;
 use Scalar::Util qw//;
+use List::Util qw/first/;
+use DBI qw//;
 
 use aliased 'Aion::Aya::Iterator';
+use aliased 'Aion::Aya::Query';
 use aliased 'Aion::Aya::Transaction';
+
+use Aion::Types qw/Nat/;
 
 use Aion::Env::Etc MAX_FREE_CONNECTS => (isa => Nat, default => 10, key => 'aion.aya.max_free_connects');
 
@@ -14,7 +19,7 @@ use Aion -role;
 
 with 'Aion::Aya::Adapter';
 
-has dsn => (is => 'ro', isa => Str);
+has dsn => (is => 'ro', isa => Str, default => sub { shift->default_dsn });
 has login => (is => 'ro', isa => Maybe[Str]);
 has password => (is => 'ro', isa => Maybe[Str]);
 has attr => (is => 'ro', isa => HashRef);
@@ -28,21 +33,24 @@ has max_free_connects => (is => 'ro', isa => Nat, default => MAX_FREE_CONNECTS);
 # В транзакции по адресу coro
 has in_transaction => (is => 'ro', isa => HashRef[Transaction]);
 
+# DSN по умолчанию для диалекта; переопределяется драйвером (MemAdapter -> DBI:Mem:)
+sub default_dsn { '' }
+
 # Адрес текущего Coro
 sub coro_current { pack 'J', Scalar::Util::refaddr $Coro::current }
 
 # Устанавливает транзакцию
 sub begin_transaction {
-	my ($self, $tansaction) = @_;
+	my ($self, $transaction) = @_;
 	die 'Transaction beginned!' if $self->{in_transaction}{$transaction->coro_current_addr};
-	$self->{in_transaction}{$transaction->coro_current_addr} = $tansaction;
+	$self->{in_transaction}{$transaction->coro_current_addr} = $transaction;
 	$self
 }
 
 # Комитит транзакцию
 sub commit {
-	my ($self, $tansaction) = @_;
-	my $old_transaction = delete $self->{in_transaction}{$old_transaction->coro_current_addr};
+	my ($self, $transaction) = @_;
+	my $old_transaction = delete $self->{in_transaction}{$transaction->coro_current_addr};
 	die 'Other transaction beginned. Commit failed!' if $old_transaction != $transaction;
 	for my $dbh (@{$transaction->{connects}}) {
 		$dbh->commit;
@@ -53,9 +61,9 @@ sub commit {
 
 # Откатывает транзакцию
 sub rollback {
-	my ($self, $tansaction) = @_;
-	my $old_transaction = delete $self->{in_transaction}{$old_transaction->coro_current_addr};
-	die 'Other transaction beginned. Commit failed!' if $old_transaction != $transaction;
+	my ($self, $transaction) = @_;
+	my $old_transaction = delete $self->{in_transaction}{$transaction->coro_current_addr};
+	die 'Other transaction beginned. Rollback failed!' if $old_transaction != $transaction;
 	for my $dbh (@{$transaction->{connects}}) {
 		$dbh->rollback;
 		$self->finish($dbh);
@@ -102,7 +110,7 @@ sub raw_iterator :Isa(Me => Str => Object[Iterator]) {
 }
 
 # Порождает итератор
-sub iterator :Isa(Me => Object[Query] => Object[Iterator]) {
+sub iterator :Isa(Me => Object['Aion::Aya::Query'] => Object[Iterator]) {
 	my ($self, $query) = @_;
 	Iterator->new(adapter => $self, session => { query => $query });
 }
@@ -117,7 +125,7 @@ sub next :Isa(Me => HashRef => Any) {
 		$self->prepare($session->{dbh}, $query);
 	};
 
-	my $row = $this->fetchrow($session->{sth});
+	my $row = $self->fetchrow($session->{sth});
 	if(defined $row) {
 		if($session->{sql}) { $row }
 		else {
@@ -126,13 +134,15 @@ sub next :Isa(Me => HashRef => Any) {
 		}
 	} else {
 		$session->{sth}->finish;
-		$self->finish($dbh);
+		delete $session->{sth};
+		$self->finish($session->{dbh});
+		delete $session->{dbh};
 		$row
 	}
 }
 
 # Для выполнения insert/update/delete
-sub execute :Isa(Me => Object[Query] => PositiveInt) {
+sub execute :Isa(Me => Object['Aion::Aya::Query'] => PositiveInt) {
 	my ($self, $query) = @_;
 	
 	my $sql = $self->transformator->transform($query);
