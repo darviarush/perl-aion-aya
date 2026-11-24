@@ -20,13 +20,13 @@ use Aion;
 undef *from;
 
 # Операция
-has operation => (is => 'ro+', isa => Enum[SELECT, INSERT, UPDATE, DELETE], default => SELECT);
+has operation => (is => 'ro', isa => Enum[SELECT, INSERT, UPDATE, DELETE], default => SELECT);
 
 # Поля в выборке: expr AS name
 has select => (is => 'ro', isa => CycleTuple[Expr, Str], lazy => 0, default => sub {+[]});
 
 # Из какого класса порождать сущности
-has from => (is => 'ro+', isa => ClassName);
+has from => (is => 'ro+', isa => ClassName & ConsumerOf['Aion::Aya']);
 
 # Объединения с другими таблицами: type => field => alias
 has join => (is => 'ro', isa => ArrayRef[xJoin], lazy => 0, default => sub {+[]});

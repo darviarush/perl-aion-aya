@@ -18,7 +18,7 @@ use Aion;
 has _appearance => (is => 'ro', isa => 'Aion::Aya::Appearance');
 
 # Класс главной сущности
-has _from => (is => 'ro', isa => ClassName);
+has _from => (is => 'ro', isa => ClassName & ConsumerOf['Aion::Aya']);
 
 # Алиас главной сущности
 has _alias => (is => 'ro', isa => Str, default => sub {
