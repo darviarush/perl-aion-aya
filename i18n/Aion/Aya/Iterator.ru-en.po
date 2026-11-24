@@ -1,0 +1,61 @@
+msgid "Aion::Aya::Iterator - курсор по строкам результата запроса с перегрузками для удобного перебора"
+msgstr "Aion::Aya::Iterator - cursor over query result lines with overloads for convenient enumeration"
+
+msgid "`Aion::Aya::Iterator` — тонкая обёртка над **сессией** адаптера. Сам итератор ничего не знает о базе: он хранит `adapter` и `session`, а всю работу делает адаптер."
+msgstr "`Aion::Aya::Iterator` is a thin wrapper over the **session** adapter. The iterator itself knows nothing about the base: it stores `adapter` and `session`, and the adapter does all the work."
+
+msgid "`session` для адаптера на `DBI` (`Aion::Aya::Adapter::Iterator::DBI`) — это хеш, который адаптер наполняет лениво, по мере вызовов `next`:"
+msgstr "`session` for an adapter on `DBI` (`Aion::Aya::Adapter::Iterator::DBI`) is a hash that the adapter fills lazily as `next` is called:"
+
+msgid ""
+"- `query` — объект `Aion::Aya::Query`, из которого трансформатор делает SQL (для `iterator`);\n"
+"- `sql` — готовый SQL (для `raw_iterator`);\n"
+"- `dbh` — соединение, берётся из пула адаптера или открывается заново;\n"
+"- `sth` — подготовленный и запущенный запрос; когда строки кончились, `sth` и `dbh` из сессии удаляются и возвращаются в пул."
+msgstr ""
+"- `query` — `Aion::Aya::Query` object, from which the transformer makes SQL (for `iterator`);\n"
+"- `sql` — ready SQL (for `raw_iterator`);\n"
+"- `dbh` — connection, taken from the adapter pool or opened again;\n"
+"- `sth` — prepared and launched request; when there are no more lines, `sth` and `dbh` are removed from the session and returned to the pool."
+
+msgid "Поэтому итератор — это **одноразовый курсор**: сессия продвигается вперёд, а вернуться к уже прочитанным строкам нельзя."
+msgstr "Therefore, an iterator is a **one-time cursor**: the session moves forward, but you cannot return to lines that have already been read."
+
+msgid "`Iterator` перегружает три операции:"
+msgstr "`Iterator` overloads three operations:"
+
+msgid ""
+"- **`@{ }`** — собрать все оставшиеся строки в массив;\n"
+"- **`&{ }`** — получить функцию-генератор, которая при каждом вызове отдаёт `next`;\n"
+"- **`< >`** — это `next` (в скалярном контексте)."
+msgstr ""
+"- **`@{ }`** — collect all remaining lines into an array;\n"
+"- **`&{ }`** — get a generator function that returns `next` every time it is called;\n"
+"- **`< >`** is `next` (in scalar context)."
+
+msgid "Объекты, которые отдаёт итератор, зависят от источника:"
+msgstr "The objects that the iterator returns depend on the source:"
+
+msgid "- для `iterator` адаптер создаёт сущность класса `$query->from` — **или** прокси-наследника, если в строке есть поля-алиасы, которых у сущности нет (см. `Aion::Aya::Adapter`);\n"
+"- для `raw_iterator` отдаётся «сырая» строка — `HashRef` с именами колонок."
+msgstr "- for `iterator`, the adapter creates an entity of class `$query->from` - **or** a proxy successor, if the line has alias fields that the entity does not have (see `Aion::Aya::Adapter`);\n"
+"- for `raw_iterator` a “raw” string is given - `HashRef` with column names."
+
+msgid "Обязательный адаптер. Требование ослабленное (`is => 'ro*'`), то есть итератор держит **слабую** ссылку на адаптер: адаптер должен жить отдельно, иначе он исчезнет и `next` упадёт."
+msgstr "Required adapter. The requirement is weakened (`is => 'ro*'`), that is, the iterator holds a **weak** reference to the adapter: the adapter must live separately, otherwise it will disappear and `next` will fall."
+
+msgid "Сессия итератора. Даёт доступ к тому же состоянию запроса, по которому идут строки: `dbh`, `sth` и исходный `query`/`sql`. Итератор передаёт её в `adapter->next`, поэтому она же является единицей состояния и для протокола адаптера."
+msgstr "Iterator session. Gives access to the same query state along which the lines go: `dbh`, `sth` and the original `query`/`sql`. The iterator passes it to `adapter->next`, so it is also a state unit for the adapter protocol."
+
+msgid "Возвращает следующую строку через `$self->{adapter}->next($self->{session})` или `undef`, когда строки закончились."
+msgstr "Returns the next line via `$self->{adapter}->next($self->{session})` or `undef` when there are no more lines."
+
+msgid "Это тот метод, который вызывают все перегрузки; реализует его адаптер."
+msgstr "This is the method that all overloads call; implements its adapter."
+
+msgid "⚖ **Perl5**"
+msgstr "⚖ **Perl5**"
+
+msgid "The Aion::Aya::Iterator module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+msgstr "The Aion::Aya::Iterator module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+
