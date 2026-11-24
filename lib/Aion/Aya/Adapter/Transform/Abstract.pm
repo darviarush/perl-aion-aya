@@ -2,7 +2,7 @@ package Aion::Aya::Adapter::Transform::Abstract;
 
 use common::sense;
 
-use aliased 'Aion::Aya::Query' => 'Query';
+use aliased 'Aion::Aya::Query';
 
 use Aion;
 
@@ -17,7 +17,7 @@ __END__
 
 =head1 NAME
 
-Aion::Aya::Adapter::Transform::Abstract - контракт для превращения Aion::Aya::Query в запрос к БД (Mysql, Elastic, etc)
+Aion::Aya::Adapter::Transform::Abstract - contract for turning Aion::Aya::Query into a database query (Mysql, Elastic, etc)
 
 =head1 SYNOPSIS
 
@@ -26,7 +26,7 @@ Aion::Aya::Adapter::Transform::Abstract - контракт для превращ
 	}
 	
 	package ExTransform {
-		use aliased 'Aion::Aya::Query' => 'Query';
+		use aliased 'Aion::Aya::Query';
 	
 		use Aion;
 	
@@ -38,9 +38,7 @@ Aion::Aya::Adapter::Transform::Abstract - контракт для превращ
 		}
 	}
 	
-	use aliased 'Aion::Aya::Query' => 'Query';
-	
-	my $sig = $Aion::META{'ExTransform'}{subroutine}{'transform'};
+	use aliased 'Aion::Aya::Query';
 	
 	my $transformator = ExTransform->new;
 	my $query = Query->new(from => 'ExEntity');
@@ -48,13 +46,13 @@ Aion::Aya::Adapter::Transform::Abstract - контракт для превращ
 
 =head1 DESCRIPTION
 
-Aion::Aya::Adapter::Transform::Abstract - контракт для превращения Aion::Aya::Query в запрос к БД (Mysql, Elastic, etc).
+Aion::Aya::Adapter::Transform::Abstract - a contract for turning Aion::Aya::Query into a database query (Mysql, Elastic, etc).
 
 =head1 SUBROUTINES
 
 =head2 transform ()
 
-Трансформирует запрос в промежуточное представление (например, SQL или структуру у Elastic).
+Transforms a query into an intermediate representation (for example, SQL or a structure in Elastic).
 
 =head1 AUTHOR
 

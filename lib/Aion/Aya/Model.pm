@@ -91,7 +91,7 @@ sub get {
 	$Aion::Aya::META{$pkg} // die "Not model from $pkg"
 }
 
-# Возвращает фичу по называнию поля 
+# Возвращает фичу по названию поля 
 sub feature {
 	my ($self, $field) = @_;
 	$Aion::META{$self->{pkg}}{feature}{$field} // die "Not $field!"
@@ -113,7 +113,7 @@ sub col_name {
 	$fld && $fld->{col}	&& $fld->{col}{name} or die "$field have'nt column!";
 }
 
-# Возвращает
+# Возвращает класс из типа фичи
 sub get_ref {
 	my ($cls, $feature) = @_;
 

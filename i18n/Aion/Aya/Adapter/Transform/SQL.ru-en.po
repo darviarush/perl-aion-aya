@@ -1,0 +1,95 @@
+msgid "Aion::Aya::Adapter::Transform::SQL - превращение Aion::Aya::Query в SQL-текст (DQL и DML)"
+msgstr "Aion::Aya::Adapter::Transform::SQL - turning Aion::Aya::Query into SQL text (DQL and DML)"
+
+msgid "Файл lib/ExEntity.pm:"
+msgstr "lib/ExEntity.pm file:"
+
+msgid "Код:"
+msgstr "Code:"
+
+msgid "`Aion::Aya::Adapter::Transform::SQL` — конкретная реализация контракта `Aion::Aya::Adapter::Transform::Abstract`: берёт `Aion::Aya::Query` и отдаёт строку SQL для DQL (`SELECT`) и DML (`INSERT`, `UPDATE`, `DELETE`)."
+msgstr "`Aion::Aya::Adapter::Transform::SQL` is a specific implementation of the `Aion::Aya::Adapter::Transform::Abstract` contract: takes `Aion::Aya::Query` and returns an SQL string for DQL (`SELECT`) and DML (`INSERT`, `UPDATE`, `DELETE`)."
+
+msgid "Роль различает диалекты через переопределяемые методы:"
+msgstr "The role differentiates dialects through overridden methods:"
+
+msgid ""
+"- `word` — как писать имя таблицы/колонки (по умолчанию без экранирования);\n"
+"- `is_keyword` — считать ли имя ключевым словом (по умолчанию никогда);\n"
+"- `quoteword` — как экранировать имя, если оно ключевое (по умолчанию обратные кавычки)."
+msgstr ""
+"- `word` — how to write the table/column name (by default, without escaping);\n"
+"- `is_keyword` — whether the name is considered a keyword (never by default);\n"
+"- `quoteword` - how to escape the name if it is a keyword (backtick quotes by default)."
+
+msgid "`Aion::Aya::Adapter::Transform::Mem` и `Aion::Aya::Adapter::Transform::Mysql` наследуют SQL и меняют только экранирование (`Mysql` экранирует обратными кавычками)."
+msgstr "`Aion::Aya::Adapter::Transform::Mem` and `Aion::Aya::Adapter::Transform::Mysql` inherit SQL and change only the escaping (`Mysql` escapes with backquotes)."
+
+msgid "Имя таблицы и колонки берутся из `Aion::Aya::Model` (`Model->get($query->from)->table` и `col_name`), поэтому переименование колонки в модели не ломает SQL."
+msgstr "The table and column name are taken from `Aion::Aya::Model` (`Model->get($query->from)->table` and `col_name`), so renaming a column in the model does not break SQL."
+
+msgid "Превращает запрос в строку SQL. Диспетчеризует по `$query->operation`: `SELECT` → `sql_select`, `INSERT` → `sql_insert`, `UPDATE` → `sql_update`, `DELETE` → `sql_delete`."
+msgstr "Turns the query into an SQL string. Dispatches by `$query->operation`: `SELECT` → `sql_select`, `INSERT` → `sql_insert`, `UPDATE` → `sql_update`, `DELETE` → `sql_delete`."
+
+msgid "Строит `SELECT`: `SELECT <поля|*> FROM [таблица](https://metacpan.org/pod/таблица)` и общую часть (см. `_select`). Поля задаются парами «выражение → псевдоним»."
+msgstr "Builds `SELECT`: `SELECT <fields|*> FROM [table](https://metacpan.org/pod/table)` and the common part (see `_select`). Fields are specified in pairs “expression → alias”."
+
+msgid "Строит `INSERT INTO [таблица](https://metacpan.org/pod/таблица) (<колонки>) VALUES (<значения>)`. Пары `select` — это значение и имя колонки."
+msgstr "Builds `INSERT INTO [table](https://metacpan.org/pod/table) (<columns>) VALUES (<values>)`. The `select` pairs are the value and name of the column."
+
+msgid "Строит `UPDATE [таблица](https://metacpan.org/pod/таблица) SET [колонка](https://metacpan.org/pod/колонка) = [значение](https://metacpan.org/pod/значение)` и общую часть. Пары `select` — значение и имя колонки."
+msgstr "Builds `UPDATE [table](https://metacpan.org/pod/table) SET [column](https://metacpan.org/pod/column) = [value](https://metacpan.org/pod/value)` and the general part. The `select` pairs are the value and name of the column."
+
+msgid "Строит `DELETE FROM [таблица](https://metacpan.org/pod/таблица)` и общую часть."
+msgstr "Builds `DELETE FROM [table](https://metacpan.org/pod/table)` and the general part."
+
+msgid "Общая хвостовая часть для всех операций: соединения, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `OFFSET`."
+msgstr "Common tail for all operations: joins, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `OFFSET`."
+
+msgid "Превращает узел дерева выражений в SQL:"
+msgstr "Turns an expression tree node into SQL:"
+
+msgid ""
+"- `Val` — значение как есть;\n"
+"- `Field` — `alias.column`;\n"
+"- `UOp` — `op exp` (`NOT b.title`);\n"
+"- `Op` — `left op right` (`b.title=Clarissa`)."
+msgstr ""
+"- `Val` — value as is;\n"
+"- `Field` - `alias.column`;\n"
+"- `UOp` - `op exp` (`NOT b.title`);\n"
+"- `Op` — `left op right` (`b.title=Clarissa`)."
+
+msgid "Пишет имя таблицы или колонки: экранирует через `quoteword`, если `is_keyword` истинно, иначе возвращает как есть."
+msgstr "Writes the name of a table or column: escapes via `quoteword` if `is_keyword` is true, otherwise returns as is."
+
+msgid "Считает ли имя ключевым словом. В SQL по умолчанию — никогда; диалект переопределяет."
+msgstr "Does the name count as a keyword? In SQL, the default is never; dialect redefines."
+
+msgid "Экранирует ключевое слово. В SQL и MySQL — обратными кавычками."
+msgstr "Escapes a keyword. In SQL and MySQL - backticks."
+
+msgid "Библиотека в разработке, и у диалекта SQL сейчас есть ограничения:"
+msgstr "The library is in development, and the SQL dialect currently has limitations:"
+
+msgid ""
+"* **Конструктор не создаётся.** `TransformSQL->new` падает с `Signature mismatch`: `transform` в `SQL` объявлен как `:Isa(Me => Query => Str)`, а контракт `Abstract` требует `Any`. Пока это не исправят, в примерах объект создаётся через `bless`, а `transform` вызвать нельзя.\n"
+"* **`transform` требует `Abstract`-объект.** Даже при `bless` вызов `transform` проверяет первый аргумент по типу из `Abstract` (`Object['Query']`) и падает, если `Query` не разрешается в класс. Поэтому в примерах показаны `sql_*` и `expr` напрямую.\n"
+"* **`join` должен быть хешем для `_select`.** `_select` делает `%{$query->{join}}`, а `Aion::Aya::Query` хранит `join` как массив, так что `sql_select` без правки `$query->{join} = {}` падает на `Not a HASH reference`.\n"
+"* **`insert` различает формы `join`.** `sql_insert` проверяет `@{$query->{join}}` (массив) для выбора `INSERT ... SELECT`, а затем вызывает `_select`, где `join` нужен хешем.\n"
+"* **`filter`/`having` в `_select` проверяются на истинность.** У `Aion::Aya::Query::Expr::Op` есть перегрузка `&{}` без `bool`, поэтому выражение в `filter` даёт `Operation \"bool\": no method found`.\n"
+"* **`ORDER BY` собирается из пар.** `Aion::Aya::Query` хранит `order_by` как пары «выражение — `ASC`/`DESC`», а `_select` склеивает их через `pairmap` с разделителем `' '`, поэтому в SQL попадает лишний разделитель."
+msgstr ""
+"* **The constructor is not created.** `TransformSQL->new` crashes with `Signature mismatch`: `transform` in `SQL` is declared as `:Isa(Me => Query => Str)`, and the `Abstract` contract requires `Any`. Until this is fixed, in the examples the object is created via `bless`, but `transform` cannot be called.\n"
+"* **`transform` requires an `Abstract` object.** Even with `bless`, the `transform` call checks the first argument against the type of `Abstract` (`Object['Query']`) and fails if `Query` does not resolve to the class. That's why the examples show `sql_*` and `expr` directly.\n"
+"* **`join` must be a hash for `_select`.** `_select` does `%{$query->{join}}`, and `Aion::Aya::Query` stores `join` as an array, so `sql_select` without editing `$query->{join} = {}` falls on `Not a HASH reference`.\n"
+"* **`insert` distinguishes between forms of `join`.** `sql_insert` checks `@{$query->{join}}` (array) for `INSERT ... SELECT` and then calls `_select` where `join` needs a hash.\n"
+"* **`filter`/`having` in `_select` are checked for truth.** `Aion::Aya::Query::Expr::Op` has an overload of `&{}` without `bool`, so the expression in `filter` gives `Operation \"bool\": no method found`.\n"
+"* **`ORDER BY` is assembled from pairs.** `Aion::Aya::Query` stores `order_by` as “expression - `ASC`/`DESC` pairs”, and `_select` glues them together through `pairmap` with the delimiter `' '`, so the extra delimiter ends up in SQL."
+
+msgid "⚖ **Perl5**"
+msgstr "⚖ **Perl5**"
+
+msgid "The Aion::Aya::Adapter::Transform::SQL module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+msgstr "The Aion::Aya::Adapter::Transform::SQL module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+

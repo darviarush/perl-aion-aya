@@ -1,0 +1,15 @@
+msgid "Aion::Aya::Adapter::Transform::Abstract - контракт для превращения Aion::Aya::Query в запрос к БД (Mysql, Elastic, etc)"
+msgstr "Aion::Aya::Adapter::Transform::Abstract - contract for turning Aion::Aya::Query into a database query (Mysql, Elastic, etc)"
+
+msgid "Aion::Aya::Adapter::Transform::Abstract - контракт для превращения Aion::Aya::Query в запрос к БД (Mysql, Elastic, etc)."
+msgstr "Aion::Aya::Adapter::Transform::Abstract - a contract for turning Aion::Aya::Query into a database query (Mysql, Elastic, etc)."
+
+msgid "Трансформирует запрос в промежуточное представление (например, SQL или структуру у Elastic)."
+msgstr "Transforms a query into an intermediate representation (for example, SQL or a structure in Elastic)."
+
+msgid "⚖ **Perl5**"
+msgstr "⚖ **Perl5**"
+
+msgid "The Aion::Aya::Adapter::Transform::Abstract module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+msgstr "The Aion::Aya::Adapter::Transform::Abstract module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+

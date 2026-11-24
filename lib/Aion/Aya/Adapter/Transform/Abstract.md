@@ -1,3 +1,4 @@
+!ru:en
 # NAME
 
 Aion::Aya::Adapter::Transform::Abstract - контракт для превращения Aion::Aya::Query в запрос к БД (Mysql, Elastic, etc)
@@ -10,7 +11,7 @@ package ExEntity {
 }
 
 package ExTransform {
-	use aliased 'Aion::Aya::Query' => 'Query';
+	use aliased 'Aion::Aya::Query';
 
 	use Aion;
 
@@ -22,9 +23,7 @@ package ExTransform {
 	}
 }
 
-use aliased 'Aion::Aya::Query' => 'Query';
-
-my $sig = $Aion::META{'ExTransform'}{subroutine}{'transform'};
+use aliased 'Aion::Aya::Query';
 
 my $transformator = ExTransform->new;
 my $query = Query->new(from => 'ExEntity');
