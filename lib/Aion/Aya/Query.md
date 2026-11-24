@@ -27,12 +27,12 @@ my $query = Aion::Aya::Query->new(
 
 $query->operation                   # -> 'select'
 $query->from                        # -> 'Storage::Book::Synopsis'
-scalar(@{$query->select})              # -> 0
+scalar(@{$query->select})           # -> 0
 $query->join->[0]->{alias}          # -> 'a'
 $query->join->[0]->{join}           # -> 'left'
-scalar(@{$query->group_by})            # -> 0
+scalar(@{$query->group_by})         # -> 0
 $query->having                      # -> undef
-scalar(@{$query->order_by})            # -> 0
+scalar(@{$query->order_by})         # -> 0
 $query->offset                      # -> 20
 $query->limit                       # -> 10
 $query->filter                      # -> undef
