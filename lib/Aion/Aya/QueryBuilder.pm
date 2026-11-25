@@ -39,32 +39,44 @@ has _query => (is => 'ro', isa => Query, lazy => 0, default => sub {
 	Query->new(from => $self->_from);
 });
 
+#@category Клонирование
+
+# Клонирует QueryBuilder
+sub clone {
+	my ($self, %opt) = @_;
+	
+	my $query = $self->_query->clone(%{$opt{_query}});
+	my %aliases = (%{$self->_aliases}, %{$opt{aliases}});
+	bless { %$self, _query => $query, %{$opt{self}}, aliases => \%aliases }, ref $self;
+}
+
 #@category Описатели
 
 # Переключение на операцию delete
 sub delete {
 	my ($self) = @_;
-	my $query = $self->_query->clone(operation => Query->DELETE);
-	ref($self)->new(%$self, _query => $query);
+	$self->clone(_query => {operation => Query->DELETE});
 }
 
 # Переключение на операцию update, annotate превращается в секцию set 
 sub update {
 	my ($self, @update) = @_;
-	my $query = $self->_query->clone(operation => Query->UPDATE);
-	ref($self)->new(%$self, _query => $query)->annotate(@update);
+	$self->clone(_query => {operation => Query->UPDATE})->annotate(@update);
 }
 
 # Переключение на операцию insert, annotate превращается в секцию set 
 sub insert {
 	my ($self, @insert) = @_;
-	my $query = $self->_query->clone(operation => Query->INSERT);
-	ref($self)->new(%$self, _query => $query)->annotate(@insert);
+	$self->clone(_query => {operation => Query->INSERT})->annotate(@insert);
 }
 
 # Присоединяет другую сущность внутренним (inner) объединением
 sub inner_join {
-	my ($self, $alias, $field) = @_;
+	my ($self, $field, $alias) = @_;
+	# $qb->inner_join('user as u')
+	# $qb->inner_join(user => -u)
+	# $qb->inner_join('u.admin as a')
+	# $qb->inner_join(u__admin => -a)
 	$self->_query->clone(join => +{ @{$self->_query->join}, xJoin->new(field => $field, alias => $alias, join => 'inner') });
 }
 
