@@ -8,6 +8,7 @@ use aliased 'Aion::Aya::Query::Expr';
 use aliased 'Aion::Aya::Query::Expr::Field';
 use aliased 'Aion::Aya::Query::Expr::Op';
 use aliased 'Aion::Aya::Query::Expr::Val';
+use aliased 'Aion::Aya::Query::Join' => 'xJoin';
 use aliased 'Aion::Aya::Iterator';
 
 use List::Util qw/pairmap reduce/;
@@ -41,13 +42,19 @@ has _query => (is => 'ro', isa => Query, lazy => 0, default => sub {
 
 #@category Клонирование
 
-# Клонирует QueryBuilder
+# Клонирует QueryBuilder: Query клонируется отдельно, алиасы копируются
 sub clone {
 	my ($self, %opt) = @_;
-	
-	my $query = $self->_query->clone(%{$opt{_query}});
-	my %aliases = (%{$self->_aliases}, %{$opt{aliases}});
-	bless { %$self, _query => $query, %{$opt{self}}, aliases => \%aliases }, ref $self;
+
+	my $self_opt = $opt{self} // {};
+	my $aliases = { %{$self->_aliases}, %{$opt{aliases} // {}} };
+
+	bless {
+		%$self,
+		%$self_opt,
+		_aliases => $aliases,
+		_query => $self->_query->clone(%{$opt{_query} // {}}),
+	}, ref $self;
 }
 
 #@category Описатели
@@ -70,20 +77,58 @@ sub insert {
 	$self->clone(_query => {operation => Query->INSERT})->annotate(@insert);
 }
 
-# Присоединяет другую сущность внутренним (inner) объединением
+# Присоединяет другую сущность внутренним (inner) объединением. Допустимые формы — см. _make_join
 sub inner_join {
-	my ($self, $field, $alias) = @_;
-	# $qb->inner_join('user as u')
-	# $qb->inner_join(user => -u)
-	# $qb->inner_join('u.admin as a')
-	# $qb->inner_join(u__admin => -a)
-	$self->_query->clone(join => +{ @{$self->_query->join}, xJoin->new(field => $field, alias => $alias, join => 'inner') });
+	my ($self, @join) = @_;
+
+	$self->_make_join('inner', @join);
 }
 
-# Присоединяет другую сущность левым (left) объединением
+# Присоединяет другую сущность левым (left) объединением. Допустимые формы — см. _make_join
 sub left_join {
-	my ($self, $alias, $field) = @_;
-	$self->_query->clone(join => +{ @{$self->_query->join}, xJoin->new(field => $field, alias => $alias, join => 'left') });
+	my ($self, @join) = @_;
+
+	$self->_make_join('left', @join);
+}
+
+# Разбирает описание объединения и добавляет его в запрос клона.
+# Формы:
+#   'user as u'         — таблица user из главной сущности, алиас u
+#   user => -u          — то же самое, тире у алиаса отбрасывается
+#   'u.admin as a'      — поле admin из уже присоединенного алиаса u, алиас a
+#   u__admin => -a      — то же в виде "алиас__поле => алиас"
+sub _make_join {
+	my ($self, $type, @join) = @_;
+
+	my ($field, $alias);
+
+	# Строковая форма: '<field> as <alias>' (один аргумент)
+	if (@join == 1) {
+		$join[0] =~ /^\s*(.+?)(?:\s+as\s+([\w\-]+))?\s*$/i
+			or die "Bad join description: $join[0]";
+		($field, $alias) = ($1, $2);
+	}
+	# Парная форма: field => alias
+	else {
+		die 'Join expects a pair <field => alias>' if @join != 2;
+		($field, $alias) = @join;
+	}
+
+	$alias =~ s/^-// if defined $alias;
+	$alias //= $self->_alias;
+
+	# field может быть 'u.admin' или 'u__admin' — алиас и поле
+	my ($from_alias, $name) = $field =~ /^([^._]+)(?:\.|__)(.+)$/
+		? ($1, $2)
+		: ($self->_alias, $field);
+
+	die "Unknown alias '$from_alias' in join '$field'"
+		unless exists $self->_aliases->{$from_alias} || $from_alias eq $self->_alias;
+
+	$self->clone(
+		_query => { join => [ @{$self->_query->join}, xJoin->new(field => $field, alias => $alias, join => $type) ] },
+		aliases => { $alias => $self->_aliases->{$from_alias} },
+	);
 }
 
 # Добавляет поля, которые или есть в объекте и их нужно подтянуть или которые будут добавлены в PROXY-объект.
@@ -103,7 +148,7 @@ sub annotate {
 		}
 	}
 
-	$self->_query->clone(select => \@out);
+	$self->clone(_query => {select => \@out});
 }
 
 # Добавляет поля в выборку поверх уже отобранных
@@ -116,78 +161,82 @@ sub add_annotate {
 sub filter {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
-	$self->_query->clone(filter => $op);
+	$self->clone(_query => {filter => $op});
 }
 
 # Дополняет условие фильтрации логическим И (AND)
 sub and_filter {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
-	$self->_query->clone(filter => Op->new(left => $self->filter, op => 'AND', right => $op));
+	my $old = $self->_query->filter;
+	$self->clone(_query => {filter => defined $old? Op->new(left => $old, op => 'AND', right => $op): $op});
 }
 
 # Дополняет условие фильтрации логическим ИЛИ (OR)
 sub or_filter {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
-	$self->_query->clone(filter => Op->new(left => $self->filter, op => 'OR', right => $op));
+	my $old = $self->_query->filter;
+	$self->clone(_query => {filter => defined $old? Op->new(left => $old, op => 'OR', right => $op): $op});
 }
 
 # Задаёт группировку
 sub group_by {
 	my ($self, @groups) = @_;
-	$self->_query->clone(group_by => \@groups);
+	$self->clone(_query => {group_by => \@groups});
 }
 
 # Добавляет поля в группировку поверх уже заданных
 sub add_group_by {
 	my ($self, @groups) = @_;
-	$self->_query->clone(group_by => [@{$self->_group_by}, @groups]);
+	$self->clone(_query => {group_by => [@{$self->_query->group_by}, @groups]});
 }
 
 # Задаёт условие фильтрации после группировки (HAVING)
 sub having {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
-	$self->_query->clone(having => $op);
+	$self->clone(_query => {having => $op});
 }
 
 # Дополняет условие HAVING логическим И (AND)
 sub and_having {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
-	$self->_query->clone(having => Op->new(left => $self->having, op => 'AND', right => $op));
+	my $old = $self->_query->having;
+	$self->clone(_query => {having => defined $old? Op->new(left => $old, op => 'AND', right => $op): $op});
 }
 
 # Дополняет условие HAVING логическим ИЛИ (OR)
 sub or_having {
 	my ($self, @expr) = @_;
 	my $op = $self->_plain_op(@expr);
-	$self->_query->clone(having => Op->new(left => $self->having, op => 'OR', right => $op));
+	my $old = $self->_query->having;
+	$self->clone(_query => {having => defined $old? Op->new(left => $old, op => 'OR', right => $op): $op});
 }
 
 # Задаёт сортировку
 sub order_by {
 	my ($self, @orders) = @_;
-	$self->_query->clone(order_by => \@orders);
+	$self->clone(_query => {order_by => \@orders});
 }
 
 # Добавляет сортировку поверх уже заданной
 sub add_order_by {
 	my ($self, @orders) = @_;
-	$self->_query->clone(order_by => [@{$self->order_by}, @orders]);
+	$self->clone(_query => {order_by => [@{$self->_query->order_by}, @orders]});
 }
 
 # Задаёт смещение выборки
 sub offset {
 	my ($self, $offset) = @_;
-	 $self->_query->clone(offset => $offset);
+	$self->clone(_query => {offset => $offset});
 }
 
 # Задаёт ограничение количества строк
 sub limit {
 	my ($self, $limit) = @_;
-	 $self->_query->clone(limit => $limit);
+	$self->clone(_query => {limit => $limit});
 }
 
 #@category Получатели
