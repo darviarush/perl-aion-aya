@@ -307,3 +307,285 @@ sub show_foreign {
 }
 
 1;
+
+__END__
+
+=encoding utf-8
+
+=head1 NAME
+
+Aion::Aya::Adapter::Diff::MemDiff - comparison of models with the DBD::Mem structure and DDL generation
+
+=head1 SYNOPSIS
+
+File lib/DiffExample.pm:
+
+	package DiffExample;
+	use common::sense;
+	
+	use Aion;
+	use Aion::Aya::Table;
+	use Aion::Aya::Adapter::Diff::MemDiff;
+	use Aion::Aya::Adapter::Transform::SQL;
+	
+	# MemDiff берёт экранирование у transformator адаптера, поэтому нужен adapter
+	package DiffAdapter {
+		use Aion;
+		with 'Aion::Aya::Adapter';
+	
+		has adapter => (is => 'ro', isa => 'Aion::Aya::Adapter', default => sub { undef });
+		has transformator => (is => 'ro', isa => 'Aion::Aya::Adapter::Transform::Abstract', default => sub { Aion::Aya::Adapter::Transform::SQL->new });
+		sub iterator :Isa(Me => Object['Aion::Aya::Query'] => Object['Aion::Aya::Iterator']) { }
+		sub execute :Isa(Me => Object['Aion::Aya::Query'] => PositiveInt) { }
+		sub next_val :Isa(Me => Object['Aion::Aya'] => Str) { }
+		sub next :Isa(Me => Hashref => Any) { }
+	}
+	
+	package DiffExample;
+	our $diff = bless { adapter => DiffAdapter->new }, 'Aion::Aya::Adapter::Diff::MemDiff';
+	
+	our $book = Aion::Aya::Table->new(
+		table => 'book',
+		primary_key => {columns => ['id'], options => []},
+		columns => [
+			{name => 'id', type => 'int', is_nullable => 0, default => '', options => '', comment => '', order => 0},
+			{name => 'title', type => 'varchar(255)', is_nullable => 0, default => '', options => '', comment => '', order => 1},
+		],
+	);
+	
+	1;
+
+
+
+	use DiffExample;
+	
+	my $ddl = $DiffExample::diff->diff({book => $DiffExample::book}, {});
+	
+	ref $ddl  # -> 'ARRAY'
+	scalar @$ddl # -> 1
+	$ddl->[0] =~ /^CREATE TABLE book/ # -> 1
+
+=head1 DESCRIPTION
+
+C<MemDiff> is an implementation of C<Aion::Aya::Adapter::Diff::Abstract> for an in-memory database on C<DBD::Mem>. The module can do two things:
+
+=over
+
+=item * B<compare> a set of models with a set of base tables (C<diff>) and return DDL that brings the base to the models;
+
+=item * B<build DDL text> based on the table description (C<Aion::Aya::Table>): C<CREATE TABLE>, C<DROP TABLE>, C<ALTER TABLE>, columns, keys, foreign keys.
+
+=back
+
+C<Aion::Aya::Adapter::Diff::MysqlDiff> inherits C<MemDiff> and only changes C<model2table> (adds comments from annotations).
+
+DDL methods collect text and names are escaped via C<word>, which delegates to C<< adapter-E<gt>transformator-E<gt>word >>. That's why C<MemDiff> is kept next to C<adapter>.
+
+=head1 FEATURES
+
+=head2 adapter
+
+The adapter from which the connection (C<connect>/C<finish>), transformer (C<word>) and metadata are taken. Inherited from C<Abstract>.
+
+=head1 SUBROUTINES
+
+=head2 diff ($models, $database)
+
+Compares two hashes “table name => C<Aion::Aya::Table>”: the model and the current database structure. Returns a reference to a DDL array:
+
+=over
+
+=item * the table is in the models, but not in the database → C<CREATE TABLE>;
+
+=item * the table is in the database, but not in the models → C<DROP TABLE>;
+
+=item * identical tables → nothing.
+
+=back
+
+Changes within existing tables (ALTER) are not yet evaluated.
+
+	use DiffExample;
+	
+	my $ddl = $DiffExample::diff->diff({book => $DiffExample::book}, {});
+	
+	scalar @$ddl # -> 1
+	$ddl->[0] =~ /^CREATE TABLE book/ # -> 1
+	
+	# Одинаковые структуры — пустой список
+	my $same = $DiffExample::diff->diff({book => $DiffExample::book}, {book => $DiffExample::book});
+	
+	scalar @$same # -> 0
+
+=head2 model2table ($model)
+
+Builds C<Aion::Aya::Table> from the model (C<Aion::Aya::Model>): iterates through C<col> fields by C<order>, takes types via C<isa2type>, takes into account C<Maybe> (nullable) and the primary key. C<MemDiff> has no comments or options because C<DBD::Mem> does not support them.
+
+	use DiffExample;
+	
+	ref $DiffExample::diff->can('model2table') # -> 'CODE'
+
+=head2 structure ()
+
+Reads the table structure from C<DBD::Mem> (C<table_info>/C<column_info>) and returns the hash "name => C<Aion::Aya::Table>". Requires a working C<< adapter-E<gt>connect >>.
+
+=head2 isa2type ($isa)
+
+Converts an Aion type to a SQL type name. For C<DBD::Mem>, C<Int>, C<TinyInt>, C<LongInt> are supported (C<int>/C<tinyint>/C<int>); unknown type - exception C<Not convert isa ... to type!>.
+
+	use DiffExample;
+	use Aion::Aya::Types;
+	
+	$DiffExample::diff->isa2type(Int())     # -> 'int'
+	$DiffExample::diff->isa2type(TinyInt()) # -> 'tinyint'
+	$DiffExample::diff->isa2type(LongInt()) # -> 'int'
+
+=head2 get_tables ()
+
+Returns the names of database tables via C<table_info>. Used in C<structure>.
+
+=head2 get_columns ($table)
+
+Returns a description of the table columns via C<column_info>: C<name>, C<type>, C<is_nullable>, C<default> (from C<SQL::Statement>), C<order>. C<options>/C<comment> are always empty.
+
+=head2 get_indexes ($table)
+
+Preparation: reads the primary key via C<primary_key_info> and statistics via C<statistics_info>, but does not return indexes yet.
+
+=head2 word ($word)
+
+Table/column name escaping: delegates to C<< adapter-E<gt>transformator-E<gt>word >>.
+
+=head2 show_create_table ($table)
+
+C<CREATE TABLE {table} (\n{columns, primary key, indexes, foreign keys}\n)>.
+
+	use DiffExample;
+	
+	my $sql = $DiffExample::diff->show_create_table($DiffExample::book);
+	
+	$sql =~ /^CREATE TABLE book \(/ # -> 1
+	$sql =~ /PRIMARY KEY \(id\)/     # -> 1
+
+=head2 show_drop_table ($table)
+
+C<DROP TABLE {table}>.
+
+	use DiffExample;
+	
+	$DiffExample::diff->show_drop_table($DiffExample::book) # -> 'DROP TABLE book'
+
+=head2 show_rename_table ($table, $to)
+
+C<ALTER TABLE {table} RENAME TO {new name}>.
+
+	use DiffExample;
+	
+	$DiffExample::diff->show_rename_table($DiffExample::book, 'book2') # -> 'ALTER TABLE book RENAME TO book2'
+
+=head2 show_truncate_table ($table)
+
+Clears a table: C<DELETE FROM {table}>.
+
+	use DiffExample;
+	
+	$DiffExample::diff->show_truncate_table($DiffExample::book) # -> 'DELETE FROM book'
+
+=head2 show_modify_table ($table)
+
+C<ALTER TABLE {таблица}> + опции таблицы. There are no options in C<DBD::Mem> (C<show_definition_table> returns an empty string), so C<ALTER TABLE book> is obtained.
+
+	use DiffExample;
+	
+	$DiffExample::diff->show_modify_table($DiffExample::book) # -> 'ALTER TABLE book '
+
+=head2 show_create_definition ($table)
+
+Internals of C<CREATE TABLE>: columns, C<PRIMARY KEY>, indexes (C<unique_keys>, C<index_keys>), foreign keys connected via C<,\n>.
+
+	use DiffExample;
+	
+	my $t = Aion::Aya::Table->new(
+		table => 'book',
+		primary_key => {columns => ['id'], options => []},
+		columns => [{name => 'id', type => 'int', is_nullable => 0, default => '', options => '', comment => '', order => 0}],
+		index_keys => [{name => 'idx_book', columns => ['title'], options => []}],
+	);
+	
+	$DiffExample::diff->show_create_definition($t) =~ /PRIMARY KEY \(id\),\nKEY idx_book \(title\)/ # -> 1
+
+=head2 show_definition_table ($table, $create)
+
+Table options. C<MemDiff> is always an empty string; heirs can override.
+
+=head2 show_column ($col)
+
+Column named: C<{name} {type [NOT NULL] [DEFAULT ...] [options]}>.
+
+	use DiffExample;
+	
+	$DiffExample::diff->show_column({name => 'id', type => 'int', is_nullable => 0}) # -> 'id int NOT NULL'
+
+=head2 show_definition_column ($col, $with_keys)
+
+Unnamed column definition: type (default C<TEXT>), C<NOT NULL>, C<DEFAULT>, options.
+
+	use DiffExample;
+	
+	$DiffExample::diff->show_definition_column({type => 'int', is_nullable => 0, default => 7}) # -> 'int NOT NULL DEFAULT 7'
+
+=head2 show_index ($index)
+
+An index named: C<KEY {name} ({columns})>.
+
+	use DiffExample;
+	
+	$DiffExample::diff->show_index({name => 'idx_book', columns => ['title']}) # -> 'KEY idx_book (title)'
+
+=head2 show_definition_index ($index)
+
+Unnamed index: C<({columns})>.
+
+=head2 show_foreign ($fk)
+
+A foreign key named: C<CONSTRAINT {name} FOREIGN KEY ({columns}) REFERENCES {table} ({columns})>.
+
+	use DiffExample;
+	
+	$DiffExample::diff->show_foreign({name => 'fk_book_author', to_table => 'author', columns => ['author_id'], to_columns => ['id']}) # -> 'CONSTRAINT fk_book_author FOREIGN KEY (author_id) REFERENCES author (id)'
+
+=head2 show_definition_foreign ($fk)
+
+Unnamed foreign key: C<FOREIGN KEY (...) REFERENCES ... (...)>.
+
+=head2 show_create_database / show_drop_database / show_modify_database / show_definition_database
+
+DDL for the database (C<CREATE DATABASE>, C<DROP DATABASE>, C<ALTER DATABASE>). C<show_definition_database> returns C<DEFAULT CHARACTER SET>/C<DEFAULT COLLATE> pairs if the object has C<charset>/C<collation>.
+
+=head1 GOTCHAS
+
+=over
+
+=item * B<< C<< MemDiff-E<gt>new >> crashes. >> C<model2table> in C<MemDiff> is declared as C<< :Isa(Me =E<gt> Model =E<gt> Table) >>, and the C<Abstract> contract is declared as C<< :Isa(Me =E<gt> Model =E<gt> Table) >> with type C<Aion::Aya::Model>; signatures do not match (C<Signature mismatch>). Plus the C<Model> in the signature resolves to the non-existent C<Object['Model']>. Therefore, in the examples, the object is created using C<bless>, but C<model2table> does not work yet.
+
+=item * B<< C<adapter> is required for C<word>. >> DDL methods are called C<word> → C<< adapter-E<gt>transformator-E<gt>word >>, so C<adapter> is needed even for pure text generation.
+
+=item * B<< C<diff> only works for C<Aion::Aya::Table>. >> Both arguments are checked as C<HashRef[Object['Aion::Aya::Table']]>, so you cannot pass column hashes instead of objects.
+
+=item * B<ALTER of existing tables is not implemented.> C<diff> only does C<CREATE>/C<DROP>; column/index changes - C<TODO>.
+
+=item * B<< C<structure> requires a working connection. >> It goes to C<< adapter-E<gt>connect >> and C<DBD::Mem>, so it is not checked in isolation from the database.
+
+=back
+
+=head1 AUTHOR
+
+Yaroslav O. Kosmina L<mailto:dart@cpan.org>
+
+=head1 LICENSE
+
+⚖ B<Perl5>
+
+=head1 COPYRIGHT
+
+The Aion::Aya::Adapter::Diff::MemDiff module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved.

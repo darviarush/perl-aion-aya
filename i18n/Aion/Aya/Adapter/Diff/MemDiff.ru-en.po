@@ -1,0 +1,120 @@
+msgid "Aion::Aya::Adapter::Diff::MemDiff - сравнение моделей со структурой DBD::Mem и генерация DDL"
+msgstr "Aion::Aya::Adapter::Diff::MemDiff - comparison of models with the DBD::Mem structure and DDL generation"
+
+msgid "Файл lib/DiffExample.pm:"
+msgstr "File lib/DiffExample.pm:"
+
+msgid "`MemDiff` — реализация `Aion::Aya::Adapter::Diff::Abstract` для in-memory базы на `DBD::Mem`. Модуль умеет две вещи:"
+msgstr "`MemDiff` is an implementation of `Aion::Aya::Adapter::Diff::Abstract` for an in-memory database on `DBD::Mem`. The module can do two things:"
+
+msgid "- **сравнивать** набор моделей с набором таблиц базы (`diff`) и возвращать DDL, приводящий базу к моделям;\n"
+"- **строить текст DDL** по описанию таблицы (`Aion::Aya::Table`): `CREATE TABLE`, `DROP TABLE`, `ALTER TABLE`, столбцы, ключи, внешние ключи."
+msgstr "- **compare** a set of models with a set of base tables (`diff`) and return DDL that brings the base to the models;\n"
+"- **build DDL text** based on the table description (`Aion::Aya::Table`): `CREATE TABLE`, `DROP TABLE`, `ALTER TABLE`, columns, keys, foreign keys."
+
+msgid "`Aion::Aya::Adapter::Diff::MysqlDiff` наследует `MemDiff` и меняет только `model2table` (добавляет комментарии из аннотаций)."
+msgstr "`Aion::Aya::Adapter::Diff::MysqlDiff` inherits `MemDiff` and only changes `model2table` (adds comments from annotations)."
+
+msgid "DDL-методы собирают текст, а имена экранируются через `word`, который делегирует `adapter->transformator->word`. Поэтому `MemDiff` держат рядом с `adapter`."
+msgstr "DDL methods collect text and names are escaped via `word`, which delegates to `adapter->transformator->word`. That's why `MemDiff` is kept next to `adapter`."
+
+msgid "Адаптер, у которого берутся соединение (`connect`/`finish`), трансформер (`word`) и метаданные. Наследуется от `Abstract`."
+msgstr "The adapter from which the connection (`connect`/`finish`), transformer (`word`) and metadata are taken. Inherited from `Abstract`."
+
+msgid "Сравнивает два хеша «имя таблицы => `Aion::Aya::Table`»: модели и текущую структуру базы. Возвращает ссылку на массив DDL:"
+msgstr "Compares two hashes “table name => `Aion::Aya::Table`”: the model and the current database structure. Returns a reference to a DDL array:"
+
+msgid ""
+"- таблица есть в моделях, но нет в базе → `CREATE TABLE`;\n"
+"- таблица есть в базе, но нет в моделях → `DROP TABLE`;\n"
+"- одинаковые таблицы → ничего."
+msgstr ""
+"- the table is in the models, but not in the database → `CREATE TABLE`;\n"
+"- the table is in the database, but not in the models → `DROP TABLE`;\n"
+"- identical tables → nothing."
+
+msgid "Изменения внутри существующих таблиц (ALTER) пока не вычисляются."
+msgstr "Changes within existing tables (ALTER) are not yet evaluated."
+
+msgid "Строит `Aion::Aya::Table` из модели (`Aion::Aya::Model`): перебирает `col`-поля по `order`, берёт типы через `isa2type`, учитывает `Maybe` (nullable) и первичный ключ. У `MemDiff` нет комментариев и опций, потому что `DBD::Mem` их не поддерживает."
+msgstr "Builds `Aion::Aya::Table` from the model (`Aion::Aya::Model`): iterates through `col` fields by `order`, takes types via `isa2type`, takes into account `Maybe` (nullable) and the primary key. `MemDiff` has no comments or options because `DBD::Mem` does not support them."
+
+msgid "Читает структуру таблиц из `DBD::Mem` (`table_info`/`column_info`) и возвращает хеш «имя => `Aion::Aya::Table`». Требует работающего `adapter->connect`."
+msgstr "Reads the table structure from `DBD::Mem` (`table_info`/`column_info`) and returns the hash \"name => `Aion::Aya::Table`\". Requires a working `adapter->connect`."
+
+msgid "Преобразует тип Aion в имя SQL-типа. Для `DBD::Mem` поддерживаются `Int`, `TinyInt`, `LongInt` (`int`/`tinyint`/`int`); неизвестный тип — исключение `Not convert isa … to type!`."
+msgstr "Converts an Aion type to a SQL type name. For `DBD::Mem`, `Int`, `TinyInt`, `LongInt` are supported (`int`/`tinyint`/`int`); unknown type - exception `Not convert isa ... to type!`."
+
+msgid "Возвращает имена таблиц базы через `table_info`. Используется в `structure`."
+msgstr "Returns the names of database tables via `table_info`. Used in `structure`."
+
+msgid "Возвращает описание столбцов таблицы через `column_info`: `name`, `type`, `is_nullable`, `default` (из `SQL::Statement`), `order`. `options`/`comment` всегда пусты."
+msgstr "Returns a description of the table columns via `column_info`: `name`, `type`, `is_nullable`, `default` (from `SQL::Statement`), `order`. `options`/`comment` are always empty."
+
+msgid "Заготовка: читает первичный ключ через `primary_key_info` и статистику через `statistics_info`, но индексы пока не возвращает."
+msgstr "Preparation: reads the primary key via `primary_key_info` and statistics via `statistics_info`, but does not return indexes yet."
+
+msgid "Экранирование имени таблицы/колонки: делегирует `adapter->transformator->word`."
+msgstr "Table/column name escaping: delegates to `adapter->transformator->word`."
+
+msgid "`CREATE TABLE {таблица} (\\n{столбцы, первичный ключ, индексы, внешние ключи}\\n)`."
+msgstr "`CREATE TABLE {table} (\\n{columns, primary key, indexes, foreign keys}\\n)`."
+
+msgid "`DROP TABLE {таблица}`."
+msgstr "`DROP TABLE {table}`."
+
+msgid "`ALTER TABLE {таблица} RENAME TO {новое имя}`."
+msgstr "`ALTER TABLE {table} RENAME TO {new name}`."
+
+msgid "Очищает таблицу: `DELETE FROM {таблица}`."
+msgstr "Clears a table: `DELETE FROM {table}`."
+
+msgid "`ALTER TABLE {таблица} ` + опции таблицы. В `DBD::Mem` опций нет (`show_definition_table` возвращает пустую строку), поэтому получается `ALTER TABLE book `."
+msgstr "`ALTER TABLE {таблица} ` + опции таблицы. There are no options in `DBD::Mem` (`show_definition_table` returns an empty string), so `ALTER TABLE book` is obtained."
+
+msgid "Внутренности `CREATE TABLE`: столбцы, `PRIMARY KEY`, индексы (`unique_keys`, `index_keys`), внешние ключи, соединённые через `,\\n`."
+msgstr "Internals of `CREATE TABLE`: columns, `PRIMARY KEY`, indexes (`unique_keys`, `index_keys`), foreign keys connected via `,\\n`."
+
+msgid "Опции таблицы. В `MemDiff` всегда пустая строка; наследники могут переопределить."
+msgstr "Table options. `MemDiff` is always an empty string; heirs can override."
+
+msgid "Столбец с именем: `{имя} {тип [NOT NULL] [DEFAULT …] [опции]}`."
+msgstr "Column named: `{name} {type [NOT NULL] [DEFAULT ...] [options]}`."
+
+msgid "Определение столбца без имени: тип (по умолчанию `TEXT`), `NOT NULL`, `DEFAULT`, опции."
+msgstr "Unnamed column definition: type (default `TEXT`), `NOT NULL`, `DEFAULT`, options."
+
+msgid "Индекс с именем: `KEY {имя} ({колонки})`."
+msgstr "An index named: `KEY {name} ({columns})`."
+
+msgid "Индекс без имени: `({колонки})`."
+msgstr "Unnamed index: `({columns})`."
+
+msgid "Внешний ключ с именем: `CONSTRAINT {имя} FOREIGN KEY ({колонки}) REFERENCES {таблица} ({колонки})`."
+msgstr "A foreign key named: `CONSTRAINT {name} FOREIGN KEY ({columns}) REFERENCES {table} ({columns})`."
+
+msgid "Внешний ключ без имени: `FOREIGN KEY (...) REFERENCES ... (...)`."
+msgstr "Unnamed foreign key: `FOREIGN KEY (...) REFERENCES ... (...)`."
+
+msgid "DDL для базы (`CREATE DATABASE`, `DROP DATABASE`, `ALTER DATABASE`). `show_definition_database` отдаёт пары `DEFAULT CHARACTER SET`/`DEFAULT COLLATE`, если у объекта есть `charset`/`collation`."
+msgstr "DDL for the database (`CREATE DATABASE`, `DROP DATABASE`, `ALTER DATABASE`). `show_definition_database` returns `DEFAULT CHARACTER SET`/`DEFAULT COLLATE` pairs if the object has `charset`/`collation`."
+
+msgid ""
+"* **`MemDiff->new` падает.** `model2table` в `MemDiff` объявлен как `:Isa(Me => Model => Table)`, а контракт `Abstract` — как `:Isa(Me => Model => Table)` с типом `Aion::Aya::Model`; сигнатуры не совпадают (`Signature mismatch`). Плюс `Model` в сигнатуре разрешается в несуществующий `Object['Model']`. Поэтому в примерах объект создаётся через `bless`, а `model2table` пока не работает.\n"
+"* **`adapter` обязателен для `word`.** DDL-методы зовут `word` → `adapter->transformator->word`, поэтому `adapter` нужен даже для чистой генерации текста.\n"
+"* **`diff` работает только для `Aion::Aya::Table`.** Оба аргумента проверяются как `HashRef[Object['Aion::Aya::Table']]`, поэтому передавать хеши столбцов вместо объектов нельзя.\n"
+"* **ALTER существующих таблиц не реализован.** `diff` делает только `CREATE`/`DROP`; изменения столбцов/индексов — `TODO`.\n"
+"* **`structure` требует рабочего соединения.** Он ходит в `adapter->connect` и `DBD::Mem`, поэтому в отрыве от базы не проверяется."
+msgstr ""
+"* **`MemDiff->new` crashes.** `model2table` in `MemDiff` is declared as `:Isa(Me => Model => Table)`, and the `Abstract` contract is declared as `:Isa(Me => Model => Table)` with type `Aion::Aya::Model`; signatures do not match (`Signature mismatch`). Plus the `Model` in the signature resolves to the non-existent `Object['Model']`. Therefore, in the examples, the object is created using `bless`, but `model2table` does not work yet.\n"
+"* **`adapter` is required for `word`.** DDL methods are called `word` → `adapter->transformator->word`, so `adapter` is needed even for pure text generation.\n"
+"* **`diff` only works for `Aion::Aya::Table`.** Both arguments are checked as `HashRef[Object['Aion::Aya::Table']]`, so you cannot pass column hashes instead of objects.\n"
+"* **ALTER of existing tables is not implemented.** `diff` only does `CREATE`/`DROP`; column/index changes - `TODO`.\n"
+"* **`structure` requires a working connection.** It goes to `adapter->connect` and `DBD::Mem`, so it is not checked in isolation from the database."
+
+msgid "⚖ **Perl5**"
+msgstr "⚖ **Perl5**"
+
+msgid "The Aion::Aya::Adapter::Diff::MemDiff module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+msgstr "The Aion::Aya::Adapter::Diff::MemDiff module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+
