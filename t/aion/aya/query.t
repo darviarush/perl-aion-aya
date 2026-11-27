@@ -6,9 +6,22 @@ use common::sense; use open qw/:std :utf8/;  use Carp qw//; use Cwd qw//; use Fi
 # 
 subtest 'SYNOPSIS' => sub { 
 package Storage::Book::Synopsis {
-	use Aion;
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
 
-	has title => (is => 'ro', isa => Str);
+	presents 'books';
+
+	has title  => (is => 'ro', isa => Str, col => 1);
+	has author => (is => 'ro', isa => Object['Storage::Author::Synopsis'], ref => 1);
+}
+
+package Storage::Author::Synopsis {
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
+
+	presents 'authors';
+
+	has id => (is => 'ro', isa => Int, pk => 1, col => 1);
 }
 
 use Aion::Aya::Query;
@@ -17,7 +30,7 @@ use aliased 'Aion::Aya::Query::Join' => 'xJoin';
 my $query = Aion::Aya::Query->new(
 	from => 'Storage::Book::Synopsis',
 	select => [],
-	join => [xJoin->new(field => 'author', alias => 'a', join => 'left')],
+	join => [xJoin->new(join => 'left', model => 'Storage::Book::Synopsis', field => 'author', from_alias => 'S', to_alias => 'a')],
 	group_by => [],
 	having => undef,
 	order_by => [],
@@ -28,8 +41,9 @@ my $query = Aion::Aya::Query->new(
 local ($::_g0 = do {$query->operation}, $::_e0 = do {'select'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->operation                   # -> \'select\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 local ($::_g0 = do {$query->from}, $::_e0 = do {'Storage::Book::Synopsis'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->from                        # -> \'Storage::Book::Synopsis\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 local ($::_g0 = do {scalar(@{$query->select})}, $::_e0 = do {0}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'scalar(@{$query->select})           # -> 0' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->join->[0]->{alias}}, $::_e0 = do {'a'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->join->[0]->{alias}          # -> \'a\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->join->[0]->{to_alias}}, $::_e0 = do {'a'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->join->[0]->{to_alias}       # -> \'a\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 local ($::_g0 = do {$query->join->[0]->{join}}, $::_e0 = do {'left'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->join->[0]->{join}           # -> \'left\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->join->[0]->{field}}, $::_e0 = do {'author'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->join->[0]->{field}          # -> \'author\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 local ($::_g0 = do {scalar(@{$query->group_by})}, $::_e0 = do {0}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'scalar(@{$query->group_by})         # -> 0' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 local ($::_g0 = do {$query->having}, $::_e0 = do {undef}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->having                      # -> undef' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 local ($::_g0 = do {scalar(@{$query->order_by})}, $::_e0 = do {0}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'scalar(@{$query->order_by})         # -> 0' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
@@ -64,9 +78,12 @@ eval {Aion::Aya::Query->new}; local ($::_g0 = $@, $::_e0 = 'from required'); ok 
 # 
 ::done_testing; }; subtest 'clone ()' => sub { 
 package Storage::Book::Clone {
-	use Aion;
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
 
-	has title => (is => 'ro', isa => Str);
+	presents 'books';
+
+	has title => (is => 'ro', isa => Str, col => 1);
 }
 
 use Aion::Aya::Query;

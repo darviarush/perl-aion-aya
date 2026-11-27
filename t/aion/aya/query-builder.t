@@ -6,9 +6,13 @@ use common::sense; use open qw/:std :utf8/;  use Carp qw//; use Cwd qw//; use Fi
 # 
 subtest 'SYNOPSIS' => sub { 
 package Storage::Book::Builder {
-	use Aion;
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
 
-	has title => (is => 'ro', isa => Str);
+	presents 'books';
+
+	has id    => (is => 'ro', isa => Int, pk => 1, col => 1);
+	has title => (is => 'ro', isa => Str, col => 1);
 }
 
 use Aion::Aya::QueryBuilder;
@@ -19,126 +23,148 @@ my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Builder');
 local ($::_g0 = do {$qb->_from}, $::_e0 = do {'Storage::Book::Builder'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->_from  # -> \'Storage::Book::Builder\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 local ($::_g0 = do {$qb->_alias}, $::_e0 = do {'S'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->_alias # -> \'S\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
-# Фильтр: пара «поле => значение»
-my $query = $qb->filter(title => 'Clarissa');
+# Каждый шаг возвращает новый QueryBuilder — можно строить цепочку
+my $query = $qb->filter(title => 'Clarissa')->limit(10);
 
-local ($::_g0 = do {ref $query}, $::_e0 = do {'Aion::Aya::Query'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'ref $query           # -> \'Aion::Aya::Query\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->filter->op}, $::_e0 = do {'='}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->filter->op   # -> \'=\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->filter->left->name}, $::_e0 = do {'title'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->filter->left->name   # -> \'title\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->filter->left->alias}, $::_e0 = do {'S'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->filter->left->alias  # -> \'S\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->filter->right->value}, $::_e0 = do {'Clarissa'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->filter->right->value # -> \'Clarissa\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {ref $query}, $::_e0 = do {'Aion::Aya::QueryBuilder'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'ref $query                    # -> \'Aion::Aya::QueryBuilder\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->filter->op}, $::_e0 = do {'='}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->filter->op    # -> \'=\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->filter->left->name}, $::_e0 = do {'title'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->filter->left->name   # -> \'title\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->filter->left->alias}, $::_e0 = do {'S'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->filter->left->alias  # -> \'S\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->filter->right->value}, $::_e0 = do {'Clarissa'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->filter->right->value # -> \'Clarissa\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->{limit}}, $::_e0 = do {10}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->{limit}       # -> 10' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
-# Несколько условий соединяются через AND
-my $both = $qb->filter(title => 'Clarissa', author => 7);
-
-local ($::_g0 = do {$both->filter->op}, $::_e0 = do {'AND'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$both->filter->op       # -> \'AND\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$both->filter->left->op}, $::_e0 = do {'='}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$both->filter->left->op # -> \'=\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$both->filter->right->op}, $::_e0 = do {'='}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$both->filter->right->op # -> \'=\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+# Исходный билдер не изменяется
+local ($::_g0 = do {$qb->_query->{limit}}, $::_e0 = do {undef}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->_query->{limit} # -> undef' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
 # 
 # # DESCRIPTION
 # 
-# `QueryBuilder` — надстройка над `Aion::Aya::Query` для пошаговой сборки запроса. Каждый метод возвращает **новый** `Aion::Aya::Query`, а не меняет текущий: исходный `$qb` остаётся нетронутым, поэтому из одного билдера можно построить несколько независимых запросов.
+# `QueryBuilder` — надстройка над `Aion::Aya::Query` для пошаговой сборки запроса. Каждый метод возвращает **новый `QueryBuilder`** (через `clone`), а не меняет текущий и не возвращает голый `Query`. Поэтому шаги можно объединять в цепочку: `$qb->filter(...)->limit(10)->offset(5)`, а исходный `$qb` остаётся нетронутым.
 # 
-# Важно учитывать при использовании: методы возвращают именно `Query`, а не `QueryBuilder`. Значит цепочка вида `$qb->filter(...)->order_by(...)` не соберётся — `order_by` у `Query` — это фича, а не билдер-метод. Правильно сохранять промежуточный результат и строить следующий шаг от `$qb` или от нового билдера.
+# Сам запрос доступен у результата в фиче `_query`. Имя главной сущности задаётся `_from`; `_alias` — псевдоним, выводимый из имени класса: имя режется по одинарным `_`, от каждого непустого куска берётся первая буква. `::` сегменты не делит, поэтому `Storage::Book::Builder` даёт `S`, а `Book_A_B` — `BAB`. Псевдонимы присоединённых сущностей хранит `_aliases`.
 # 
-# Имя главной сущности задаётся `_from`. `_alias` — псевдоним, который выводится из имени класса: имя режется по одинарным `_`, от каждого непустого куска берётся первая буква. `::` сегменты не делит, поэтому `Storage::Book::Annotate` даёт `S`, а `Book_A_B` — `BAB`. Псевдонимы присоединённых сущностей хранит `_aliases`; по ним разрешаются поля вида `alias__field`.
-# 
-# Условия фильтрации строятся из пар «поле => значение». Поле без `__` относится к главной сущности, поле вида `alias__field` — к присоединённой. Если последний сегмент — оператор (`eq`, `ne`, `le`, `ge`, `gt`, `lt`, `like`, `unlike`, `isnull`, `isnotnull`), он становится оператором сравнения, иначе используется `=`.
+# Условия фильтрации строятся из пар «поле => значение». Поле без `__`/`.` относится к главной сущности, поле вида `alias__field`/`alias.field` — к присоединённой. Если последний сегмент — оператор (`eq`, `ne`, `le`, `ge`, `gt`, `lt`, `like`, `unlike`, `isnull`, `isnotnull`), он становится оператором сравнения, иначе используется `=`.
 # 
 # # SUBROUTINES
 # 
+# ## clone (%opt)
+# 
+# Клонирует билдер: запрос клонируется отдельно, алиасы копируются в новый хеш. Опции:
+# 
+# - `_query` — изменения для `Query->clone` (`{ operation => ..., limit => ... }`);
+# - `aliases` — добавляемые/переопределяемые алиасы;
+# - `self` — произвольные изменения самого билдера.
+# 
+::done_testing; }; subtest 'clone (%opt)' => sub { 
+package Storage::Book::Clone {
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
+
+	presents 'books';
+
+	has title => (is => 'ro', isa => Str, col => 1);
+}
+
+my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Clone');
+
+my $copy = $qb->clone(_query => { limit => 5 });
+
+local ($::_g0 = do {ref $copy}, $::_e0 = do {'Aion::Aya::QueryBuilder'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'ref $copy               # -> \'Aion::Aya::QueryBuilder\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$copy->_query->{limit}}, $::_e0 = do {5}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$copy->_query->{limit}  # -> 5' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$qb->_query->{limit}}, $::_e0 = do {undef}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->_query->{limit}    # -> undef' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
+# 
 # ## filter (@expr)
 # 
-# Задаёт условие `WHERE`. Значения передаются парами «поле => значение», условия соединяются через `AND`.
-# 
-# Оператор задаётся вторым подчёркиванием в имени поля. Без оператора используется `=`. Доступны `eq`, `ne`, `le`, `ge`, `gt`, `lt`, `like`, `unlike`, `isnull`, `isnotnull`.
+# Задаёт условие `WHERE` из пар «поле => значение»; пары соединяются через `AND`. Оператор задаётся вторым `__` в имени поля.
 # 
 ::done_testing; }; subtest 'filter (@expr)' => sub { 
 package Storage::Book::Filter {
-	use Aion;
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
 
-	has title => (is => 'ro', isa => Str);
+	presents 'books';
+
+	has title => (is => 'ro', isa => Str, col => 1);
 }
-
-use Aion::Aya::QueryBuilder;
 
 my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Filter');
 
 my $query = $qb->filter(title => 'Clarissa');
 
-local ($::_g0 = do {$query->filter->op}, $::_e0 = do {'='}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->filter->op           # -> \'=\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->filter->left->name}, $::_e0 = do {'title'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->filter->left->name   # -> \'title\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->filter->right->value}, $::_e0 = do {'Clarissa'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->filter->right->value # -> \'Clarissa\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->filter->op}, $::_e0 = do {'='}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->filter->op           # -> \'=\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->filter->left->name}, $::_e0 = do {'title'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->filter->left->name   # -> \'title\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->filter->right->value}, $::_e0 = do {'Clarissa'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->filter->right->value # -> \'Clarissa\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
-# Несколько пар
-my $two = $qb->filter(title => 'Clarissa', author => 7);
-local ($::_g0 = do {$two->filter->op}, $::_e0 = do {'AND'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$two->filter->op # -> \'AND\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+my $two = $qb->filter(title => 'Clarissa', title => 7);
+local ($::_g0 = do {$two->_query->filter->op}, $::_e0 = do {'AND'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$two->_query->filter->op # -> \'AND\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
-# Оператор в имени поля: field__op => значение
-local ($::_g0 = do {$qb->filter(title__like => '%ari%')->filter->op}, $::_e0 = do {'like'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->filter(title__like => \'%ari%\')->filter->op  # -> \'like\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$qb->filter(title__ne => 'x')->filter->op}, $::_e0 = do {'ne'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->filter(title__ne => \'x\')->filter->op      # -> \'ne\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$qb->filter(title__eq => 'x')->filter->op}, $::_e0 = do {'eq'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->filter(title__eq => \'x\')->filter->op      # -> \'eq\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$qb->filter(title__like => '%ari%')->_query->filter->op}, $::_e0 = do {'like'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->filter(title__like => \'%ari%\')->_query->filter->op # -> \'like\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$qb->filter(title__ne => 'x')->_query->filter->op}, $::_e0 = do {'ne'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->filter(title__ne => \'x\')->_query->filter->op       # -> \'ne\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
 # 
-# ## and_filter ($expr)
+# ## and_filter (@expr)
 # 
-# Добавляет условие к уже заданному через `AND`.
+# Добавляет условие через `AND`. Если предыдущего условия нет, ставит новое без `AND`.
 # 
-::done_testing; }; subtest 'and_filter ($expr)' => sub { 
-package Storage::Book::AndFilter {
-	use Aion;
+::done_testing; }; subtest 'and_filter (@expr)' => sub { 
+my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Filter');
 
-	has title => (is => 'ro', isa => Str);
-}
+local ($::_g0 = do {$qb->and_filter(title => 'x')->_query->filter->op}, $::_e0 = do {'='}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->and_filter(title => \'x\')->_query->filter->op # -> \'=\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
-use Aion::Aya::QueryBuilder;
+my $narrowed = $qb->filter(title => 'x')->and_filter(title => 'y');
 
-my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::AndFilter');
-
-my $query = $qb->filter(title => 'Clarissa');
-my $narrowed = $qb->filter(title => 'Clarissa')->filter->left;
-
-local ($::_g0 = do {$narrowed->name}, $::_e0 = do {'title'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$narrowed->name # -> \'title\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-
-# AND на уровне целиком строится через filter с двумя парами:
-my $two = $qb->filter(title => 'Clarissa', author => 7);
-local ($::_g0 = do {$two->filter->op}, $::_e0 = do {'AND'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$two->filter->op # -> \'AND\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$narrowed->_query->filter->op}, $::_e0 = do {'AND'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$narrowed->_query->filter->op       # -> \'AND\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$narrowed->_query->filter->left->op}, $::_e0 = do {'='}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$narrowed->_query->filter->left->op # -> \'=\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
 # 
 # ## or_filter (@expr)
 # 
-# Добавляет условие через `OR`.
+# Добавляет условие через `OR`. Если предыдущего условия нет, ставит новое без `OR`.
+# 
+::done_testing; }; subtest 'or_filter (@expr)' => sub { 
+my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Filter');
+
+local ($::_g0 = do {$qb->or_filter(title => 'x')->_query->filter->op}, $::_e0 = do {'='}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->or_filter(title => \'x\')->_query->filter->op # -> \'=\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
+local ($::_g0 = do {$qb->filter(title => 'x')->or_filter(title => 'y')->_query->filter->op}, $::_e0 = do {'OR'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->filter(title => \'x\')->or_filter(title => \'y\')->_query->filter->op # -> \'OR\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
 # 
 # ## annotate (@select)
 # 
-# Добавляет поля в выборку. Поле без `Expr` превращается в `Field` главной сущности.
+# Добавляет поля в выборку: `Expr => Str` или просто имя поля (превращается в поле главной сущности).
 # 
 ::done_testing; }; subtest 'annotate (@select)' => sub { 
 package Storage::Book::Annotate {
-	use Aion;
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
 
-	has title => (is => 'ro', isa => Str);
+	presents 'books';
+
+	has title => (is => 'ro', isa => Str, col => 1);
 }
-
-use Aion::Aya::QueryBuilder;
 
 my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
 
-# Алиас берёт первые буквы сегментов через _: "Storage::Book::Annotate" даёт S
-local ($::_g0 = do {$qb->_alias}, $::_e0 = do {'S'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->_alias # -> \'S\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-
 my $query = $qb->annotate('title');
 
-local ($::_g0 = do {scalar(@{$query->select})}, $::_e0 = do {2}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'scalar(@{$query->select})    # -> 2' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->select->[1]}, $::_e0 = do {'title'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->select->[1]          # -> \'title\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->select->[0]->name}, $::_e0 = do {'title'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->select->[0]->name    # -> \'title\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->select->[0]->alias}, $::_e0 = do {'S'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->select->[0]->alias   # -> \'S\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {scalar(@{$query->_query->select})}, $::_e0 = do {2}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'scalar(@{$query->_query->select})    # -> 2' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->select->[1]}, $::_e0 = do {'title'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->select->[1]          # -> \'title\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->select->[0]->name}, $::_e0 = do {'title'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->select->[0]->name    # -> \'title\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->select->[0]->alias}, $::_e0 = do {'S'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->select->[0]->alias   # -> \'S\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
 # 
 # ## add_annotate (@select)
 # 
 # Добавляет поля поверх уже отобранных.
+# 
+::done_testing; }; subtest 'add_annotate (@select)' => sub { 
+my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
+
+my $query = $qb->annotate('title')->add_annotate('id');
+
+local ($::_g0 = do {scalar(@{$query->_query->select})}, $::_e0 = do {4}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'scalar(@{$query->_query->select}) # -> 4' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
 # 
 # ## group_by (@groups)
 # 
@@ -147,6 +173,17 @@ local ($::_g0 = do {$query->select->[0]->alias}, $::_e0 = do {'S'}); ::ok define
 # ## add_group_by (@groups)
 # 
 # Добавляет выражения в `GROUP BY` поверх уже заданных.
+# 
+::done_testing; }; subtest 'add_group_by (@groups)' => sub { 
+use aliased 'Aion::Aya::Query::Expr::Field';
+
+my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
+my $t = Field->new(alias => 'S', name => 'title', entity => 'Storage::Book::Annotate');
+
+my $query = $qb->group_by($t)->add_group_by($t);
+
+local ($::_g0 = do {scalar(@{$query->_query->group_by})}, $::_e0 = do {2}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'scalar(@{$query->_query->group_by}) # -> 2' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
 # 
 # ## having (@expr)
 # 
@@ -160,38 +197,46 @@ local ($::_g0 = do {$query->select->[0]->alias}, $::_e0 = do {'S'}); ::ok define
 # 
 # Дополняет `HAVING` через `OR`.
 # 
+::done_testing; }; subtest 'or_having (@expr)' => sub { 
+my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
+
+local ($::_g0 = do {$qb->having(title => 'x')->_query->having->op}, $::_e0 = do {'='}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->having(title => \'x\')->_query->having->op # -> \'=\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$qb->having(title => 'x')->and_having(title => 'y')->_query->having->op}, $::_e0 = do {'AND'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$qb->having(title => \'x\')->and_having(title => \'y\')->_query->having->op # -> \'AND\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
+# 
 # ## order_by (@orders)
 # 
-# Задаёт `ORDER BY`.
+# Задаёт `ORDER BY`. Значения — пары «выражение/поле => `ASC`|`DESC`».
 # 
 # ## add_order_by (@orders)
 # 
 # Добавляет сортировку поверх уже заданной.
+# 
+::done_testing; }; subtest 'add_order_by (@orders)' => sub { 
+my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
+my $t = Field->new(alias => 'S', name => 'title', entity => 'Storage::Book::Annotate');
+
+my $query = $qb->order_by($t => 'ASC')->add_order_by($t => 'DESC');
+
+local ($::_g0 = do {scalar(@{$query->_query->order_by})}, $::_e0 = do {4}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'scalar(@{$query->_query->order_by}) # -> 4' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
+# 
+# ## offset ($offset)
+# 
+# Задаёт смещение выборки.
 # 
 # ## limit ($limit)
 # 
 # Задаёт ограничение количества строк.
 # 
 ::done_testing; }; subtest 'limit ($limit)' => sub { 
-package Storage::Book::Limit {
-	use Aion;
+my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
 
-	has title => (is => 'ro', isa => Str);
-}
+my $query = $qb->limit(10)->offset(2);
 
-use Aion::Aya::QueryBuilder;
+local ($::_g0 = do {$query->_query->{limit}}, $::_e0 = do {10}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->{limit}  # -> 10' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$query->_query->{offset}}, $::_e0 = do {2}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->_query->{offset} # -> 2' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
-my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Limit');
-
-my $query = $qb->limit(10);
-
-local ($::_g0 = do {ref $query}, $::_e0 = do {'Aion::Aya::Query'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, 'ref $query     # -> \'Aion::Aya::Query\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$query->limit}, $::_e0 = do {10}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$query->limit  # -> 10' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-
-# 
-# ## offset ($offset)
-# 
-# Задаёт смещение выборки.
 # 
 # ## delete ()
 # 
@@ -199,19 +244,72 @@ local ($::_g0 = do {$query->limit}, $::_e0 = do {10}); ::ok defined($::_g0) == d
 # 
 # ## update (@update)
 # 
-# Переключает запрос на операцию `UPDATE`, переданные поля становятся секцией `SET`.
+# Переключает запрос на `UPDATE`, переданные поля становятся секцией `SET`.
 # 
 # ## insert (@insert)
 # 
-# Переключает запрос на операцию `INSERT`, переданные поля становятся секцией `SET`.
+# Переключает запрос на `INSERT`, переданные поля становятся секцией `SET`.
 # 
-# ## inner_join ($alias, $field)
+# ## inner_join ($field, $alias)
 # 
 # Присоединяет сущность внутренним (`INNER`) объединением.
 # 
-# ## left_join ($alias, $field)
+# ## left_join ($field, $alias)
 # 
 # Присоединяет сущность левым (`LEFT`) объединением.
+# 
+# Оба метода разбирают описание через общий `_make_join` и поддерживают формы:
+# 
+# - `'user as u'` — поле `user` **главной** сущности, алиас `u`;
+# - `user => 'u'` — то же; у алиаса отбрасывается ведущее `-` (`user => '-u'`);
+# - `'u.admin as a'` — поле `admin` уже присоединённого алиаса `u`, алиас `a`;
+# - `u__admin => 'a'` — то же в форме «алиас__поле => алиас».
+# 
+# Поле должно быть объявлено как `ref`; в `Join` кладётся модель-источник и её `ref`-поле. Имя таблицы и колонки для `ON` получает трансформер.
+# 
+::done_testing; }; subtest 'left_join ($field, $alias)' => sub { 
+package Storage::Book::Join {
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
+
+	presents 'books';
+
+	has id      => (is => 'ro', isa => Int, pk => 1, col => 1);
+	has user    => (is => 'ro', isa => Object['Storage::User::Join'], ref => 1);
+}
+
+package Storage::User::Join {
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
+
+	presents 'users';
+
+	has id   => (is => 'ro', isa => Int, pk => 1, col => 1);
+	has name => (is => 'ro', isa => Str, col => 1);
+}
+
+my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Join');
+
+my $joined = $qb->left_join('user as u');
+my $join = $joined->_query->join->[0];
+
+local ($::_g0 = do {$join->join}, $::_e0 = do {'left'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->join       # -> \'left\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$join->model}, $::_e0 = do {'Storage::Book::Join'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->model      # -> \'Storage::Book::Join\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$join->field}, $::_e0 = do {'user'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->field      # -> \'user\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$join->from_alias}, $::_e0 = do {'S'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->from_alias # -> \'S\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$join->to_alias}, $::_e0 = do {'u'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->to_alias   # -> \'u\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
+# Новый алиас регистрируется, по нему можно присоединять дальше
+local ($::_g0 = do {$joined->_aliases->{u}}, $::_e0 = do {'Storage::User::Join'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$joined->_aliases->{u} # -> \'Storage::User::Join\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
+# Парная форма, тире отбрасывается
+my $inner = $qb->inner_join(user => '-u');
+local ($::_g0 = do {$inner->_query->join->[0]->to_alias}, $::_e0 = do {'u'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$inner->_query->join->[0]->to_alias # -> \'u\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$inner->_query->join->[0]->join}, $::_e0 = do {'inner'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$inner->_query->join->[0]->join     # -> \'inner\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
+# Неизвестное поле
+eval {$qb->inner_join('zzz as a')}; local ($::_g0 = $@, $::_e0 = 'Not zzz field'); ok defined($::_g0) && $::_g0 =~ /^${\quotemeta $::_e0}/, '$qb->inner_join(\'zzz as a\') # @-> Not zzz field' or ::diag ::_string_diff($::_g0, $::_e0, 1); undef $::_g0; undef $::_e0;
+
 # 
 # ## iter ()
 # 

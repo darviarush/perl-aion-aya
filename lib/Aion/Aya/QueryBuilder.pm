@@ -9,6 +9,7 @@ use aliased 'Aion::Aya::Query::Expr::Field';
 use aliased 'Aion::Aya::Query::Expr::Op';
 use aliased 'Aion::Aya::Query::Expr::Val';
 use aliased 'Aion::Aya::Query::Join' => 'xJoin';
+use aliased 'Aion::Aya::Model';
 use aliased 'Aion::Aya::Iterator';
 
 use List::Util qw/pairmap reduce/;
@@ -93,8 +94,8 @@ sub left_join {
 
 # Разбирает описание объединения и добавляет его в запрос клона.
 # Формы:
-#   'user as u'         — таблица user из главной сущности, алиас u
-#   user => -u          — то же самое, тире у алиаса отбрасывается
+#   'user as u'         — поле user главной сущности, алиас u
+#   user => -u          — то же, тире у алиаса отбрасывается
 #   'u.admin as a'      — поле admin из уже присоединенного алиаса u, алиас a
 #   u__admin => -a      — то же в виде "алиас__поле => алиас"
 sub _make_join {
@@ -117,7 +118,7 @@ sub _make_join {
 	$alias =~ s/^-// if defined $alias;
 	$alias //= $self->_alias;
 
-	# field может быть 'u.admin' или 'u__admin' — алиас и поле
+	# field может быть 'u.admin' или 'u__admin' — алиас-источник и имя поля
 	my ($from_alias, $name) = $field =~ /^([^._]+)(?:\.|__)(.+)$/
 		? ($1, $2)
 		: ($self->_alias, $field);
@@ -125,9 +126,24 @@ sub _make_join {
 	die "Unknown alias '$from_alias' in join '$field'"
 		unless exists $self->_aliases->{$from_alias} || $from_alias eq $self->_alias;
 
+	# Поле должно быть ref: по нему строится соединение
+	my %models = map { $_ => Model->get($self->_aliases->{$_}) } keys %{$self->_aliases};
+	my $feature = $models{$from_alias}->{field}{$name}
+		or die "Not $name field of $self->_aliases->{$from_alias}";
+
+	die "Field $self->_aliases->{$from_alias}\::$name is not a ref!" unless $feature->{type} eq 'ref';
+
+	my ($ref_class) = @{$feature->{ref}};
+
 	$self->clone(
-		_query => { join => [ @{$self->_query->join}, xJoin->new(field => $field, alias => $alias, join => $type) ] },
-		aliases => { $alias => $self->_aliases->{$from_alias} },
+		_query => { join => [ @{$self->_query->join}, xJoin->new(
+			join => $type,
+			model => $self->_aliases->{$from_alias},
+			field => $name,
+			from_alias => $from_alias,
+			to_alias => $alias,
+		) ] },
+		aliases => { $alias => $ref_class },
 	);
 }
 
@@ -344,9 +360,13 @@ Aion::Aya::QueryBuilder - пошаговая сборка запроса пов�
 =head1 SYNOPSIS
 
 	package Storage::Book::Builder {
-		use Aion;
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
 	
-		has title => (is => 'ro', isa => Str);
+		presents 'books';
+	
+		has id    => (is => 'ro', isa => Int, pk => 1, col => 1);
+		has title => (is => 'ro', isa => Str, col => 1);
 	}
 	
 	use Aion::Aya::QueryBuilder;
@@ -357,119 +377,141 @@ Aion::Aya::QueryBuilder - пошаговая сборка запроса пов�
 	$qb->_from  # -> 'Storage::Book::Builder'
 	$qb->_alias # -> 'S'
 	
-	# Фильтр: пара «поле => значение»
-	my $query = $qb->filter(title => 'Clarissa');
+	# Каждый шаг возвращает новый QueryBuilder — можно строить цепочку
+	my $query = $qb->filter(title => 'Clarissa')->limit(10);
 	
-	ref $query           # -> 'Aion::Aya::Query'
-	$query->filter->op   # -> '='
-	$query->filter->left->name   # -> 'title'
-	$query->filter->left->alias  # -> 'S'
-	$query->filter->right->value # -> 'Clarissa'
+	ref $query                    # -> 'Aion::Aya::QueryBuilder'
+	$query->_query->filter->op    # -> '='
+	$query->_query->filter->left->name   # -> 'title'
+	$query->_query->filter->left->alias  # -> 'S'
+	$query->_query->filter->right->value # -> 'Clarissa'
+	$query->_query->{limit}       # -> 10
 	
-	# Несколько условий соединяются через AND
-	my $both = $qb->filter(title => 'Clarissa', author => 7);
-	
-	$both->filter->op       # -> 'AND'
-	$both->filter->left->op # -> '='
-	$both->filter->right->op # -> '='
+	# Исходный билдер не изменяется
+	$qb->_query->{limit} # -> undef
 
 =head1 DESCRIPTION
 
-C<QueryBuilder> — надстройка над C<Aion::Aya::Query> для пошаговой сборки запроса. Каждый метод возвращает B<новый> C<Aion::Aya::Query>, а не меняет текущий: исходный C<$qb> остаётся нетронутым, поэтому из одного билдера можно построить несколько независимых запросов.
+C<QueryBuilder> — надстройка над C<Aion::Aya::Query> для пошаговой сборки запроса. Каждый метод возвращает B<< новый C<QueryBuilder> >> (через C<clone>), а не меняет текущий и не возвращает голый C<Query>. Поэтому шаги можно объединять в цепочку: C<< $qb-E<gt>filter(...)-E<gt>limit(10)-E<gt>offset(5) >>, а исходный C<$qb> остаётся нетронутым.
 
-Важно учитывать при использовании: методы возвращают именно C<Query>, а не C<QueryBuilder>. Значит цепочка вида C<< $qb-E<gt>filter(...)-E<gt>order_by(...) >> не соберётся — C<order_by> у C<Query> — это фича, а не билдер-метод. Правильно сохранять промежуточный результат и строить следующий шаг от C<$qb> или от нового билдера.
+Сам запрос доступен у результата в фиче C<_query>. Имя главной сущности задаётся C<_from>; C<_alias> — псевдоним, выводимый из имени класса: имя режется по одинарным C<_>, от каждого непустого куска берётся первая буква. C<::> сегменты не делит, поэтому C<Storage::Book::Builder> даёт C<S>, а C<Book_A_B> — C<BAB>. Псевдонимы присоединённых сущностей хранит C<_aliases>.
 
-Имя главной сущности задаётся C<_from>. C<_alias> — псевдоним, который выводится из имени класса: имя режется по одинарным C<_>, от каждого непустого куска берётся первая буква. C<::> сегменты не делит, поэтому C<Storage::Book::Annotate> даёт C<S>, а C<Book_A_B> — C<BAB>. Псевдонимы присоединённых сущностей хранит C<_aliases>; по ним разрешаются поля вида C<alias__field>.
-
-Условия фильтрации строятся из пар «поле => значение». Поле без C<__> относится к главной сущности, поле вида C<alias__field> — к присоединённой. Если последний сегмент — оператор (C<eq>, C<ne>, C<le>, C<ge>, C<gt>, C<lt>, C<like>, C<unlike>, C<isnull>, C<isnotnull>), он становится оператором сравнения, иначе используется C<=>.
+Условия фильтрации строятся из пар «поле => значение». Поле без C<__>/C<.> относится к главной сущности, поле вида C<alias__field>/C<alias.field> — к присоединённой. Если последний сегмент — оператор (C<eq>, C<ne>, C<le>, C<ge>, C<gt>, C<lt>, C<like>, C<unlike>, C<isnull>, C<isnotnull>), он становится оператором сравнения, иначе используется C<=>.
 
 =head1 SUBROUTINES
 
-=head2 filter (@expr)
+=head2 clone (%opt)
 
-Задаёт условие C<WHERE>. Значения передаются парами «поле => значение», условия соединяются через C<AND>.
+Клонирует билдер: запрос клонируется отдельно, алиасы копируются в новый хеш. Опции:
 
-Оператор задаётся вторым подчёркиванием в имени поля. Без оператора используется C<=>. Доступны C<eq>, C<ne>, C<le>, C<ge>, C<gt>, C<lt>, C<like>, C<unlike>, C<isnull>, C<isnotnull>.
+=over
 
-	package Storage::Book::Filter {
-		use Aion;
+=item * C<_query> — изменения для C<< Query-E<gt>clone >> (C<< { operation =E<gt> ..., limit =E<gt> ... } >>);
+
+=item * C<aliases> — добавляемые/переопределяемые алиасы;
+
+=item * C<self> — произвольные изменения самого билдера.
+
+=back
+
+	package Storage::Book::Clone {
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
 	
-		has title => (is => 'ro', isa => Str);
+		presents 'books';
+	
+		has title => (is => 'ro', isa => Str, col => 1);
 	}
 	
-	use Aion::Aya::QueryBuilder;
+	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Clone');
+	
+	my $copy = $qb->clone(_query => { limit => 5 });
+	
+	ref $copy               # -> 'Aion::Aya::QueryBuilder'
+	$copy->_query->{limit}  # -> 5
+	$qb->_query->{limit}    # -> undef
+
+=head2 filter (@expr)
+
+Задаёт условие C<WHERE> из пар «поле => значение»; пары соединяются через C<AND>. Оператор задаётся вторым C<__> в имени поля.
+
+	package Storage::Book::Filter {
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
+	
+		presents 'books';
+	
+		has title => (is => 'ro', isa => Str, col => 1);
+	}
 	
 	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Filter');
 	
 	my $query = $qb->filter(title => 'Clarissa');
 	
-	$query->filter->op           # -> '='
-	$query->filter->left->name   # -> 'title'
-	$query->filter->right->value # -> 'Clarissa'
+	$query->_query->filter->op           # -> '='
+	$query->_query->filter->left->name   # -> 'title'
+	$query->_query->filter->right->value # -> 'Clarissa'
 	
-	# Несколько пар
-	my $two = $qb->filter(title => 'Clarissa', author => 7);
-	$two->filter->op # -> 'AND'
+	my $two = $qb->filter(title => 'Clarissa', title => 7);
+	$two->_query->filter->op # -> 'AND'
 	
-	# Оператор в имени поля: field__op => значение
-	$qb->filter(title__like => '%ari%')->filter->op  # -> 'like'
-	$qb->filter(title__ne => 'x')->filter->op      # -> 'ne'
-	$qb->filter(title__eq => 'x')->filter->op      # -> 'eq'
+	$qb->filter(title__like => '%ari%')->_query->filter->op # -> 'like'
+	$qb->filter(title__ne => 'x')->_query->filter->op       # -> 'ne'
 
-=head2 and_filter ($expr)
+=head2 and_filter (@expr)
 
-Добавляет условие к уже заданному через C<AND>.
+Добавляет условие через C<AND>. Если предыдущего условия нет, ставит новое без C<AND>.
 
-	package Storage::Book::AndFilter {
-		use Aion;
+	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Filter');
 	
-		has title => (is => 'ro', isa => Str);
-	}
+	$qb->and_filter(title => 'x')->_query->filter->op # -> '='
 	
-	use Aion::Aya::QueryBuilder;
+	my $narrowed = $qb->filter(title => 'x')->and_filter(title => 'y');
 	
-	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::AndFilter');
-	
-	my $query = $qb->filter(title => 'Clarissa');
-	my $narrowed = $qb->filter(title => 'Clarissa')->filter->left;
-	
-	$narrowed->name # -> 'title'
-	
-	# AND на уровне целиком строится через filter с двумя парами:
-	my $two = $qb->filter(title => 'Clarissa', author => 7);
-	$two->filter->op # -> 'AND'
+	$narrowed->_query->filter->op       # -> 'AND'
+	$narrowed->_query->filter->left->op # -> '='
 
 =head2 or_filter (@expr)
 
-Добавляет условие через C<OR>.
+Добавляет условие через C<OR>. Если предыдущего условия нет, ставит новое без C<OR>.
+
+	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Filter');
+	
+	$qb->or_filter(title => 'x')->_query->filter->op # -> '='
+	
+	$qb->filter(title => 'x')->or_filter(title => 'y')->_query->filter->op # -> 'OR'
 
 =head2 annotate (@select)
 
-Добавляет поля в выборку. Поле без C<Expr> превращается в C<Field> главной сущности.
+Добавляет поля в выборку: C<< Expr =E<gt> Str >> или просто имя поля (превращается в поле главной сущности).
 
 	package Storage::Book::Annotate {
-		use Aion;
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
 	
-		has title => (is => 'ro', isa => Str);
+		presents 'books';
+	
+		has title => (is => 'ro', isa => Str, col => 1);
 	}
-	
-	use Aion::Aya::QueryBuilder;
 	
 	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
 	
-	# Алиас берёт первые буквы сегментов через _: "Storage::Book::Annotate" даёт S
-	$qb->_alias # -> 'S'
-	
 	my $query = $qb->annotate('title');
 	
-	scalar(@{$query->select})    # -> 2
-	$query->select->[1]          # -> 'title'
-	$query->select->[0]->name    # -> 'title'
-	$query->select->[0]->alias   # -> 'S'
+	scalar(@{$query->_query->select})    # -> 2
+	$query->_query->select->[1]          # -> 'title'
+	$query->_query->select->[0]->name    # -> 'title'
+	$query->_query->select->[0]->alias   # -> 'S'
 
 =head2 add_annotate (@select)
 
 Добавляет поля поверх уже отобранных.
+
+	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
+	
+	my $query = $qb->annotate('title')->add_annotate('id');
+	
+	scalar(@{$query->_query->select}) # -> 4
 
 =head2 group_by (@groups)
 
@@ -478,6 +520,15 @@ C<QueryBuilder> — надстройка над C<Aion::Aya::Query> для по�
 =head2 add_group_by (@groups)
 
 Добавляет выражения в C<GROUP BY> поверх уже заданных.
+
+	use aliased 'Aion::Aya::Query::Expr::Field';
+	
+	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
+	my $t = Field->new(alias => 'S', name => 'title', entity => 'Storage::Book::Annotate');
+	
+	my $query = $qb->group_by($t)->add_group_by($t);
+	
+	scalar(@{$query->_query->group_by}) # -> 2
 
 =head2 having (@expr)
 
@@ -491,36 +542,40 @@ C<QueryBuilder> — надстройка над C<Aion::Aya::Query> для по�
 
 Дополняет C<HAVING> через C<OR>.
 
+	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
+	
+	$qb->having(title => 'x')->_query->having->op # -> '='
+	$qb->having(title => 'x')->and_having(title => 'y')->_query->having->op # -> 'AND'
+
 =head2 order_by (@orders)
 
-Задаёт C<ORDER BY>.
+Задаёт C<ORDER BY>. Значения — пары «выражение/поле => C<ASC>|C<DESC>».
 
 =head2 add_order_by (@orders)
 
 Добавляет сортировку поверх уже заданной.
 
-=head2 limit ($limit)
-
-Задаёт ограничение количества строк.
-
-	package Storage::Book::Limit {
-		use Aion;
+	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
+	my $t = Field->new(alias => 'S', name => 'title', entity => 'Storage::Book::Annotate');
 	
-		has title => (is => 'ro', isa => Str);
-	}
+	my $query = $qb->order_by($t => 'ASC')->add_order_by($t => 'DESC');
 	
-	use Aion::Aya::QueryBuilder;
-	
-	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Limit');
-	
-	my $query = $qb->limit(10);
-	
-	ref $query     # -> 'Aion::Aya::Query'
-	$query->limit  # -> 10
+	scalar(@{$query->_query->order_by}) # -> 4
 
 =head2 offset ($offset)
 
 Задаёт смещение выборки.
+
+=head2 limit ($limit)
+
+Задаёт ограничение количества строк.
+
+	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Annotate');
+	
+	my $query = $qb->limit(10)->offset(2);
+	
+	$query->_query->{limit}  # -> 10
+	$query->_query->{offset} # -> 2
 
 =head2 delete ()
 
@@ -528,19 +583,77 @@ C<QueryBuilder> — надстройка над C<Aion::Aya::Query> для по�
 
 =head2 update (@update)
 
-Переключает запрос на операцию C<UPDATE>, переданные поля становятся секцией C<SET>.
+Переключает запрос на C<UPDATE>, переданные поля становятся секцией C<SET>.
 
 =head2 insert (@insert)
 
-Переключает запрос на операцию C<INSERT>, переданные поля становятся секцией C<SET>.
+Переключает запрос на C<INSERT>, переданные поля становятся секцией C<SET>.
 
-=head2 inner_join ($alias, $field)
+=head2 inner_join ($field, $alias)
 
 Присоединяет сущность внутренним (C<INNER>) объединением.
 
-=head2 left_join ($alias, $field)
+=head2 left_join ($field, $alias)
 
 Присоединяет сущность левым (C<LEFT>) объединением.
+
+Оба метода разбирают описание через общий C<_make_join> и поддерживают формы:
+
+=over
+
+=item * C<'user as u'> — поле C<user> B<главной> сущности, алиас C<u>;
+
+=item * C<< user =E<gt> 'u' >> — то же; у алиаса отбрасывается ведущее C<-> (C<< user =E<gt> '-u' >>);
+
+=item * C<'u.admin as a'> — поле C<admin> уже присоединённого алиаса C<u>, алиас C<a>;
+
+=item * C<< u__admin =E<gt> 'a' >> — то же в форме «алиас__поле => алиас».
+
+=back
+
+Поле должно быть объявлено как C<ref>; в C<Join> кладётся модель-источник и её C<ref>-поле. Имя таблицы и колонки для C<ON> получает трансформер.
+
+	package Storage::Book::Join {
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
+	
+		presents 'books';
+	
+		has id      => (is => 'ro', isa => Int, pk => 1, col => 1);
+		has user    => (is => 'ro', isa => Object['Storage::User::Join'], ref => 1);
+	}
+	
+	package Storage::User::Join {
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
+	
+		presents 'users';
+	
+		has id   => (is => 'ro', isa => Int, pk => 1, col => 1);
+		has name => (is => 'ro', isa => Str, col => 1);
+	}
+	
+	my $qb = Aion::Aya::QueryBuilder->new(_from => 'Storage::Book::Join');
+	
+	my $joined = $qb->left_join('user as u');
+	my $join = $joined->_query->join->[0];
+	
+	$join->join       # -> 'left'
+	$join->model      # -> 'Storage::Book::Join'
+	$join->field      # -> 'user'
+	$join->from_alias # -> 'S'
+	$join->to_alias   # -> 'u'
+	
+	# Новый алиас регистрируется, по нему можно присоединять дальше
+	$joined->_aliases->{u} # -> 'Storage::User::Join'
+	
+	# Парная форма, тире отбрасывается
+	my $inner = $qb->inner_join(user => '-u');
+	$inner->_query->join->[0]->to_alias # -> 'u'
+	$inner->_query->join->[0]->join     # -> 'inner'
+	
+	# Неизвестное поле
+	$qb->inner_join('zzz as a') # @-> Not zzz field
 
 =head2 iter ()
 

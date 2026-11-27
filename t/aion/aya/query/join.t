@@ -5,25 +5,63 @@ use common::sense; use open qw/:std :utf8/;  use Carp qw//; use Cwd qw//; use Fi
 # # SYNOPSIS
 # 
 subtest 'SYNOPSIS' => sub { 
+package Storage::Book::Join {
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
+
+	presents 'books';
+
+	has id   => (is => 'ro', isa => Int, pk => 1, col => 1);
+	has user => (is => 'ro', isa => Object['Storage::User::Join'], ref => 1);
+}
+
+package Storage::User::Join {
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
+
+	presents 'users';
+
+	has id   => (is => 'ro', isa => Int, pk => 1, col => 1);
+	has name => (is => 'ro', isa => Str, col => 1);
+}
+
 use aliased 'Aion::Aya::Query::Join' => 'xJoin';
 
-my $join = xJoin->new(field => 'author', alias => 'a', join => 'left');
+my $join = xJoin->new(
+	join => 'left',
+	model => 'Storage::Book::Join',
+	field => 'user',
+	from_alias => 'b',
+	to_alias => 'u',
+);
 
-local ($::_g0 = do {$join->field}, $::_e0 = do {'author'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->field # -> \'author\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$join->alias}, $::_e0 = do {'a'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->alias # -> \'a\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
-local ($::_g0 = do {$join->join}, $::_e0 = do {'left'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->join  # -> \'left\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$join->join}, $::_e0 = do {'left'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->join       # -> \'left\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$join->model}, $::_e0 = do {'Storage::Book::Join'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->model      # -> \'Storage::Book::Join\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$join->field}, $::_e0 = do {'user'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->field      # -> \'user\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$join->from_alias}, $::_e0 = do {'b'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->from_alias # -> \'b\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+local ($::_g0 = do {$join->to_alias}, $::_e0 = do {'u'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$join->to_alias   # -> \'u\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
-my $inner = xJoin->new(field => 'author', alias => 'a', join => 'inner');
+my $inner = xJoin->new(join => 'inner', model => 'Storage::Book::Join', field => 'user', from_alias => 'b', to_alias => 'u');
 
 local ($::_g0 = do {$inner->join}, $::_e0 = do {'inner'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$inner->join # -> \'inner\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
 # Тип соединения ограничен inner и left
-eval {xJoin->new(field => 'author', alias => 'a', join => 'outer')}; local ($::_g0 = $@, $::_e0 = 'Set feature join must have the type'); ok defined($::_g0) && $::_g0 =~ /^${\quotemeta $::_e0}/, 'xJoin->new(field => \'author\', alias => \'a\', join => \'outer\') # @-> Set feature join must have the type' or ::diag ::_string_diff($::_g0, $::_e0, 1); undef $::_g0; undef $::_e0;
+eval {xJoin->new(join => 'outer', model => 'Storage::Book::Join', field => 'user', from_alias => 'b', to_alias => 'u')}; local ($::_g0 = $@, $::_e0 = 'Set feature join must have the type'); ok defined($::_g0) && $::_g0 =~ /^${\quotemeta $::_e0}/, 'xJoin->new(join => \'outer\', model => \'Storage::Book::Join\', field => \'user\', from_alias => \'b\', to_alias => \'u\') # @-> Set feature join must have the type' or ::diag ::_string_diff($::_g0, $::_e0, 1); undef $::_g0; undef $::_e0;
 
 # 
 # # DESCRIPTION
 # 
-# `Join` описывает, с какой таблицей и как соединяться в `SELECT`. Список соединений хранит `Aion::Aya::Query` в фиче `join`.
+# `Join` описывает одно соединение в `SELECT`. Список соединений хранит `Aion::Aya::Query` в фиче `join`.
+# 
+# `Join` — чистые данные: никакого SQL здесь нет. Как именно выглядит соединение, решает трансформер (SQL, Elastic и т. п.). Из этих данных можно собрать, например, `LEFT JOIN users u ON u.id = b.user_id`:
+# 
+# - `model` — класс модели-источника, у которой есть `ref`-поле `field` (здесь `Storage::Book::Join::user`);
+# - `field` — имя этого `ref`-поля;
+# - `from_alias` — псевдоним таблицы-источника в текущем запросе (`b`);
+# - `to_alias` — псевдоним присоединяемой таблицы (`u`);
+# - `join` — тип соединения (`inner` или `left`).
+# 
+# Результирующая модель получается из источника: `Model->get_ref(Model->get($join->model)->feature($join->field))`. Имя таблицы и имена колонок для `ON` также получает трансформер.
 # 
 # Класс подключается через `aliased` под именем `xJoin`: `Join` — ещё и тип-функция в `Aion::Types`, и в пакете с `use Aion` голое `Join->new` распознаётся как вызов прототипа.
 # 
@@ -31,17 +69,25 @@ eval {xJoin->new(field => 'author', alias => 'a', join => 'outer')}; local ($::_
 # 
 # # FEATURES
 # 
-# ## field
-# 
-# Поле сущности, по которому идёт соединение.
-# 
-# ## alias
-# 
-# Псевдоним присоединяемой таблицы.
-# 
 # ## join
 # 
 # Тип соединения: `inner` или `left`.
+# 
+# ## model
+# 
+# Класс модели-источника, чьё `ref`-поле участвует в соединении.
+# 
+# ## field
+# 
+# Имя `ref`-поля в модели `model`. По нему определяется результирующая модель и колонка источника.
+# 
+# ## from_alias
+# 
+# Псевдоним таблицы-источника в текущем запросе.
+# 
+# ## to_alias
+# 
+# Псевдоним присоединяемой таблицы.
 # 
 # # AUTHOR
 # 

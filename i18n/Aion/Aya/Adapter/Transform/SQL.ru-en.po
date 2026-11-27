@@ -31,20 +31,23 @@ msgstr "The table and column name are taken from `Aion::Aya::Model` (`Model->get
 msgid "Превращает запрос в строку SQL. Диспетчеризует по `$query->operation`: `SELECT` → `sql_select`, `INSERT` → `sql_insert`, `UPDATE` → `sql_update`, `DELETE` → `sql_delete`."
 msgstr "Turns the query into an SQL string. Dispatches by `$query->operation`: `SELECT` → `sql_select`, `INSERT` → `sql_insert`, `UPDATE` → `sql_update`, `DELETE` → `sql_delete`."
 
-msgid "Строит `SELECT`: `SELECT <поля|*> FROM [таблица](https://metacpan.org/pod/таблица)` и общую часть (см. `_select`). Поля задаются парами «выражение → псевдоним»."
-msgstr "Builds `SELECT`: `SELECT <fields|*> FROM [table](https://metacpan.org/pod/table)` and the common part (see `_select`). Fields are specified in pairs “expression → alias”."
+msgid "Строит `SELECT`: `SELECT {поля|*} FROM {таблица}` и общую часть (см. `_select`). Поля задаются парами «выражение → псевдоним»."
+msgstr "Builds `SELECT`: `SELECT {fields|*} FROM {table}` and the common part (see `_select`). Fields are specified in pairs “expression → alias”."
 
-msgid "Строит `INSERT INTO [таблица](https://metacpan.org/pod/таблица) (<колонки>) VALUES (<значения>)`. Пары `select` — это значение и имя колонки."
-msgstr "Builds `INSERT INTO [table](https://metacpan.org/pod/table) (<columns>) VALUES (<values>)`. The `select` pairs are the value and name of the column."
+msgid "Строит `INSERT INTO {таблица} ({колонки}) VALUES ({значения})`. Пары `select` — это значение и имя колонки."
+msgstr "Builds `INSERT INTO {table} ({columns}) VALUES ({values})`. The `select` pairs are the value and name of the column."
 
-msgid "Строит `UPDATE [таблица](https://metacpan.org/pod/таблица) SET [колонка](https://metacpan.org/pod/колонка) = [значение](https://metacpan.org/pod/значение)` и общую часть. Пары `select` — значение и имя колонки."
-msgstr "Builds `UPDATE [table](https://metacpan.org/pod/table) SET [column](https://metacpan.org/pod/column) = [value](https://metacpan.org/pod/value)` and the general part. The `select` pairs are the value and name of the column."
+msgid "Строит `UPDATE {таблица} SET {колонка} = {значение}` и общую часть. Пары `select` — значение и имя колонки."
+msgstr "Builds `UPDATE {table} SET {column} = {value}` and the general part. The `select` pairs are the value and name of the column."
 
-msgid "Строит `DELETE FROM [таблица](https://metacpan.org/pod/таблица)` и общую часть."
-msgstr "Builds `DELETE FROM [table](https://metacpan.org/pod/table)` and the general part."
+msgid "Строит `DELETE FROM {таблица}` и общую часть."
+msgstr "Builds `DELETE FROM {table}` and the common part."
 
 msgid "Общая хвостовая часть для всех операций: соединения, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `OFFSET`."
 msgstr "Common tail for all operations: joins, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `OFFSET`."
+
+msgid "Соединения (`join` запроса) превращаются в `JOIN` по данным из `Aion::Aya::Query::Join`: из `model` и её `ref`-поля `field` получается результирующая модель (через `Model->get_ref`), по ней — таблица и колонка первичного ключа."
+msgstr "Joins (`join` query) are turned into `JOIN` according to data from `Aion::Aya::Query::Join`: from `model` and its `ref` field `field` the resulting model is obtained (via `Model->get_ref`), from which a table and a primary key column are obtained."
 
 msgid "Превращает узел дерева выражений в SQL:"
 msgstr "Turns an expression tree node into SQL:"
@@ -73,17 +76,15 @@ msgid "Библиотека в разработке, и у диалекта SQL 
 msgstr "The library is in development, and the SQL dialect currently has limitations:"
 
 msgid ""
-"* **Конструктор не создаётся.** `TransformSQL->new` падает с `Signature mismatch`: `transform` в `SQL` объявлен как `:Isa(Me => Query => Str)`, а контракт `Abstract` требует `Any`. Пока это не исправят, в примерах объект создаётся через `bless`, а `transform` вызвать нельзя.\n"
-"* **`transform` требует `Abstract`-объект.** Даже при `bless` вызов `transform` проверяет первый аргумент по типу из `Abstract` (`Object['Query']`) и падает, если `Query` не разрешается в класс. Поэтому в примерах показаны `sql_*` и `expr` напрямую.\n"
-"* **`join` должен быть хешем для `_select`.** `_select` делает `%{$query->{join}}`, а `Aion::Aya::Query` хранит `join` как массив, так что `sql_select` без правки `$query->{join} = {}` падает на `Not a HASH reference`.\n"
-"* **`insert` различает формы `join`.** `sql_insert` проверяет `@{$query->{join}}` (массив) для выбора `INSERT ... SELECT`, а затем вызывает `_select`, где `join` нужен хешем.\n"
+"* **Конструктор не создаётся.** `TransformSQL->new` падает с `Signature mismatch`: `transform` в `SQL` объявлен как `:Isa(Me => Query => Str)`, а контракт `Abstract` требует `Any`. Пока это не исправят, объект создаётся через `bless`.\n"
+"* **`transform` требует `Abstract`-объект.** Даже при `bless` вызов `transform` проверяет первый аргумент по типу из `Abstract` (`Object['Query']`) и падает, если `Query` не разрешается в класс. Поэтому в примерах показаны `sql_*` и `_select` напрямую.\n"
+"* **`join` в `Query` — массив `Aion::Aya::Query::Join`.** Сам `Join` хранит только данные (тип, модель-источник, поле, алиасы), `JOIN ... ON ...` собирает только диалект, поэтому не-SQL трансформер напишет его иначе.\n"
 "* **`filter`/`having` в `_select` проверяются на истинность.** У `Aion::Aya::Query::Expr::Op` есть перегрузка `&{}` без `bool`, поэтому выражение в `filter` даёт `Operation \"bool\": no method found`.\n"
 "* **`ORDER BY` собирается из пар.** `Aion::Aya::Query` хранит `order_by` как пары «выражение — `ASC`/`DESC`», а `_select` склеивает их через `pairmap` с разделителем `' '`, поэтому в SQL попадает лишний разделитель."
 msgstr ""
-"* **The constructor is not created.** `TransformSQL->new` crashes with `Signature mismatch`: `transform` in `SQL` is declared as `:Isa(Me => Query => Str)`, and the `Abstract` contract requires `Any`. Until this is fixed, in the examples the object is created via `bless`, but `transform` cannot be called.\n"
-"* **`transform` requires an `Abstract` object.** Even with `bless`, the `transform` call checks the first argument against the type of `Abstract` (`Object['Query']`) and fails if `Query` does not resolve to the class. That's why the examples show `sql_*` and `expr` directly.\n"
-"* **`join` must be a hash for `_select`.** `_select` does `%{$query->{join}}`, and `Aion::Aya::Query` stores `join` as an array, so `sql_select` without editing `$query->{join} = {}` falls on `Not a HASH reference`.\n"
-"* **`insert` distinguishes between forms of `join`.** `sql_insert` checks `@{$query->{join}}` (array) for `INSERT ... SELECT` and then calls `_select` where `join` needs a hash.\n"
+"* **The constructor is not created.** `TransformSQL->new` crashes with `Signature mismatch`: `transform` in `SQL` is declared as `:Isa(Me => Query => Str)`, and the `Abstract` contract requires `Any`. Until this is fixed, the object is created via `bless`.\n"
+"* **`transform` requires an `Abstract` object.** Even with `bless`, the `transform` call checks the first argument against the type of `Abstract` (`Object['Query']`) and fails if `Query` does not resolve to the class. That's why the examples show `sql_*` and `_select` directly.\n"
+"* **`join` in `Query` is an array `Aion::Aya::Query::Join`.** `Join` itself stores only data (type, source model, field, aliases), `JOIN ... ON ...` collects only the dialect, so the non-SQL transformer will write it differently.\n"
 "* **`filter`/`having` in `_select` are checked for truth.** `Aion::Aya::Query::Expr::Op` has an overload of `&{}` without `bool`, so the expression in `filter` gives `Operation \"bool\": no method found`.\n"
 "* **`ORDER BY` is assembled from pairs.** `Aion::Aya::Query` stores `order_by` as “expression - `ASC`/`DESC` pairs”, and `_select` glues them together through `pairmap` with the delimiter `' '`, so the extra delimiter ends up in SQL."
 

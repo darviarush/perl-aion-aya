@@ -68,9 +68,22 @@ Aion::Aya::Query - запрос к базе (DQL): выборка, услови�
 =head1 SYNOPSIS
 
 	package Storage::Book::Synopsis {
-		use Aion;
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
 	
-		has title => (is => 'ro', isa => Str);
+		presents 'books';
+	
+		has title  => (is => 'ro', isa => Str, col => 1);
+		has author => (is => 'ro', isa => Object['Storage::Author::Synopsis'], ref => 1);
+	}
+	
+	package Storage::Author::Synopsis {
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
+	
+		presents 'authors';
+	
+		has id => (is => 'ro', isa => Int, pk => 1, col => 1);
 	}
 	
 	use Aion::Aya::Query;
@@ -79,7 +92,7 @@ Aion::Aya::Query - запрос к базе (DQL): выборка, услови�
 	my $query = Aion::Aya::Query->new(
 		from => 'Storage::Book::Synopsis',
 		select => [],
-		join => [xJoin->new(field => 'author', alias => 'a', join => 'left')],
+		join => [xJoin->new(join => 'left', model => 'Storage::Book::Synopsis', field => 'author', from_alias => 'S', to_alias => 'a')],
 		group_by => [],
 		having => undef,
 		order_by => [],
@@ -90,8 +103,9 @@ Aion::Aya::Query - запрос к базе (DQL): выборка, услови�
 	$query->operation                   # -> 'select'
 	$query->from                        # -> 'Storage::Book::Synopsis'
 	scalar(@{$query->select})           # -> 0
-	$query->join->[0]->{alias}          # -> 'a'
+	$query->join->[0]->{to_alias}       # -> 'a'
 	$query->join->[0]->{join}           # -> 'left'
+	$query->join->[0]->{field}          # -> 'author'
 	scalar(@{$query->group_by})         # -> 0
 	$query->having                      # -> undef
 	scalar(@{$query->order_by})         # -> 0
@@ -124,9 +138,12 @@ C<Aion::Aya::Query> — объектное представление запро
 Создаёт независимую копию запроса: изменения в копии не затрагивают оригинал.
 
 	package Storage::Book::Clone {
-		use Aion;
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
 	
-		has title => (is => 'ro', isa => Str);
+		presents 'books';
+	
+		has title => (is => 'ro', isa => Str, col => 1);
 	}
 	
 	use Aion::Aya::Query;

@@ -31,16 +31,18 @@ sub transform :Isa(Me => Query => Str) {
 sub _select {
 	my ($self, $query) = @_;
 
-	my @join  = map {
-		my $feature = Model->get($query->from)->feature($_->field);
-		my $ref_class = Model->get_ref($feature);
-		if($feature->{opt}{ref}) {
-			"\n${\($_->join eq 'inner'? 'INNER': 'LEFT')} JOIN ${\Model->get($ref_class)->table} $_->{alias} ON $_->{alias}.id = ...";
-		}
-		elsif($feature->{opt}{m2m} || $feature->{opt}{m2n} || $feature->{opt}{n2m} || $feature->{opt}{n2n}) {
-			...
-		}
-		else { die "..." }
+	my @join = map {
+		# <join> JOIN <table(result)> <to_alias>
+		# ON <to_alias>.<pk(result)> = <from_alias>.<col(field)>
+		#
+		# model — источник: по его полю field (ref) находим результирующую модель
+		my $from_model   = Model->get($_->model);
+		my $result_model = Model->get(Model->get_ref($from_model->feature($_->field)));
+		my $from_col     = $from_model->col_name($_->field);
+		my $pk           = $result_model->primary_key->{fields}->[0];
+		my $result_col   = $result_model->col_name($pk);
+
+		"\n${\ ($_->join eq 'inner'? 'INNER': 'LEFT') } JOIN ${\$result_model->table} $_->{to_alias} ON $_->{to_alias}.$result_col = $_->{from_alias}.$from_col";
 	} @{$query->{join}};
 	my @group = map { $self->expr($_) } @{$query->{group_by}};
 	my @order = pairmap { ($self->expr($a), ' ', $b) } @{$query->{order_by}};
@@ -223,7 +225,7 @@ Turns the query into an SQL string. Dispatches by C<< $query-E<gt>operation >>: 
 
 =head2 sql_select ($query)
 
-Builds C<SELECT>: C<< SELECT E<lt>fields|*E<gt> FROM [table](https://metacpan.org/pod/table) >> and the common part (see C<_select>). Fields are specified in pairs “expression → alias”.
+Builds C<SELECT>: C<SELECT {fields|*} FROM {table}> and the common part (see C<_select>). Fields are specified in pairs “expression → alias”.
 
 	my $t = TransformSQL->new;
 	my $val = Aion::Aya::Query::Expr::Val->new(value => 'Clarissa');
@@ -234,7 +236,7 @@ Builds C<SELECT>: C<< SELECT E<lt>fields|*E<gt> FROM [table](https://metacpan.or
 
 =head2 sql_insert ($query)
 
-Builds C<< INSERT INTO [table](https://metacpan.org/pod/table) (E<lt>columnsE<gt>) VALUES (E<lt>valuesE<gt>) >>. The C<select> pairs are the value and name of the column.
+Builds C<INSERT INTO {table} ({columns}) VALUES ({values})>. The C<select> pairs are the value and name of the column.
 
 	my $t = TransformSQL->new;
 	my $val = Aion::Aya::Query::Expr::Val->new(value => 'Clarissa');
@@ -243,11 +245,11 @@ Builds C<< INSERT INTO [table](https://metacpan.org/pod/table) (E<lt>columnsE<gt
 
 =head2 sql_update ($query)
 
-Builds C<UPDATE [table](https://metacpan.org/pod/table) SET [column](https://metacpan.org/pod/column) = [value](https://metacpan.org/pod/value)> and the general part. The C<select> pairs are the value and name of the column.
+Builds C<UPDATE {table} SET {column} = {value}> and the general part. The C<select> pairs are the value and name of the column.
 
 =head2 sql_delete ($query)
 
-Builds C<DELETE FROM [table](https://metacpan.org/pod/table)> and the general part.
+Builds C<DELETE FROM {table}> and the common part.
 
 	my $t = TransformSQL->new;
 	
@@ -263,6 +265,37 @@ Common tail for all operations: joins, C<WHERE>, C<GROUP BY>, C<HAVING>, C<ORDER
 	my $query = Query->new(from => 'ExEntity', limit => 5, offset => 10);
 	
 	$t->sql_select($query) # -> 'SELECT * FROM books LIMIT 5 OFFSET 10'
+
+Joins (C<join> query) are turned into C<JOIN> according to data from C<Aion::Aya::Query::Join>: from C<model> and its C<ref> field C<field> the resulting model is obtained (via C<< Model-E<gt>get_ref >>), from which a table and a primary key column are obtained.
+
+	package Storage::Book::SqlJoin {
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
+	
+		presents 'books';
+	
+		has id   => (is => 'ro', isa => Int, pk => 1, col => 1);
+		has user => (is => 'ro', isa => Object['Storage::User::SqlJoin'], ref => 1);
+	}
+	
+	package Storage::User::SqlJoin {
+		use Aion with => 'Aion::Aya';
+		use Aion::Types;
+	
+		presents 'users';
+	
+		has id => (is => 'ro', isa => Int, pk => 1, col => 1);
+	}
+	
+	use aliased 'Aion::Aya::Query::Join' => 'xJoin';
+	
+	my $t = TransformSQL->new;
+	my $query = Query->new(
+		from => 'Storage::Book::SqlJoin',
+		join => [xJoin->new(join => 'left', model => 'Storage::Book::SqlJoin', field => 'user', from_alias => 'S', to_alias => 'u')],
+	);
+	
+	$t->_select($query) # -> "\nLEFT JOIN users u ON u.id = S.user_id"
 
 =head2 expr ($expr)
 
@@ -319,13 +352,11 @@ The library is in development, and the SQL dialect currently has limitations:
 
 =over
 
-=item * B<The constructor is not created.> C<< TransformSQL-E<gt>new >> crashes with C<Signature mismatch>: C<transform> in C<SQL> is declared as C<< :Isa(Me =E<gt> Query =E<gt> Str) >>, and the C<Abstract> contract requires C<Any>. Until this is fixed, in the examples the object is created via C<bless>, but C<transform> cannot be called.
+=item * B<The constructor is not created.> C<< TransformSQL-E<gt>new >> crashes with C<Signature mismatch>: C<transform> in C<SQL> is declared as C<< :Isa(Me =E<gt> Query =E<gt> Str) >>, and the C<Abstract> contract requires C<Any>. Until this is fixed, the object is created via C<bless>.
 
-=item * B<< C<transform> requires an C<Abstract> object. >> Even with C<bless>, the C<transform> call checks the first argument against the type of C<Abstract> (C<Object['Query']>) and fails if C<Query> does not resolve to the class. That's why the examples show C<sql_*> and C<expr> directly.
+=item * B<< C<transform> requires an C<Abstract> object. >> Even with C<bless>, the C<transform> call checks the first argument against the type of C<Abstract> (C<Object['Query']>) and fails if C<Query> does not resolve to the class. That's why the examples show C<sql_*> and C<_select> directly.
 
-=item * B<< C<join> must be a hash for C<_select>. >> C<_select> does C<< %{$query-E<gt>{join}} >>, and C<Aion::Aya::Query> stores C<join> as an array, so C<sql_select> without editing C<< $query-E<gt>{join} = {} >> falls on C<Not a HASH reference>.
-
-=item * B<< C<insert> distinguishes between forms of C<join>. >> C<sql_insert> checks C<< @{$query-E<gt>{join}} >> (array) for C<INSERT ... SELECT> and then calls C<_select> where C<join> needs a hash.
+=item * B<< C<join> in C<Query> is an array C<Aion::Aya::Query::Join>. >> C<Join> itself stores only data (type, source model, field, aliases), C<JOIN ... ON ...> collects only the dialect, so the non-SQL transformer will write it differently.
 
 =item * B<< C<filter>/C<having> in C<_select> are checked for truth. >> C<Aion::Aya::Query::Expr::Op> has an overload of C<&{}> without C<bool>, so the expression in C<filter> gives C<Operation "bool": no method found>.
 

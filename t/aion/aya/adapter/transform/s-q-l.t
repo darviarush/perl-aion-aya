@@ -73,7 +73,7 @@ local ($::_g0 = do {$t->sql_insert(Query->new(from => 'ExEntity', operation => '
 # 
 # ## sql_select ($query)
 # 
-# Строит `SELECT`: `SELECT <поля|*> FROM [таблица](https://metacpan.org/pod/таблица)` и общую часть (см. `_select`). Поля задаются парами «выражение → псевдоним».
+# Строит `SELECT`: `SELECT {поля|*} FROM {таблица}` и общую часть (см. `_select`). Поля задаются парами «выражение → псевдоним».
 # 
 ::done_testing; }; subtest 'sql_select ($query)' => sub { 
 my $t = TransformSQL->new;
@@ -86,7 +86,7 @@ local ($::_g0 = do {$t->sql_select($query)}, $::_e0 = do {'SELECT Clarissa as tt
 # 
 # ## sql_insert ($query)
 # 
-# Строит `INSERT INTO [таблица](https://metacpan.org/pod/таблица) (<колонки>) VALUES (<значения>)`. Пары `select` — это значение и имя колонки.
+# Строит `INSERT INTO {таблица} ({колонки}) VALUES ({значения})`. Пары `select` — это значение и имя колонки.
 # 
 ::done_testing; }; subtest 'sql_insert ($query)' => sub { 
 my $t = TransformSQL->new;
@@ -97,11 +97,11 @@ local ($::_g0 = do {$t->sql_insert(Query->new(from => 'ExEntity', operation => '
 # 
 # ## sql_update ($query)
 # 
-# Строит `UPDATE [таблица](https://metacpan.org/pod/таблица) SET [колонка](https://metacpan.org/pod/колонка) = [значение](https://metacpan.org/pod/значение)` и общую часть. Пары `select` — значение и имя колонки.
+# Строит `UPDATE {таблица} SET {колонка} = {значение}` и общую часть. Пары `select` — значение и имя колонки.
 # 
 # ## sql_delete ($query)
 # 
-# Строит `DELETE FROM [таблица](https://metacpan.org/pod/таблица)` и общую часть.
+# Строит `DELETE FROM {таблица}` и общую часть.
 # 
 ::done_testing; }; subtest 'sql_delete ($query)' => sub { 
 my $t = TransformSQL->new;
@@ -120,6 +120,39 @@ my $t = TransformSQL->new;
 my $query = Query->new(from => 'ExEntity', limit => 5, offset => 10);
 
 local ($::_g0 = do {$t->sql_select($query)}, $::_e0 = do {'SELECT * FROM books LIMIT 5 OFFSET 10'}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$t->sql_select($query) # -> \'SELECT * FROM books LIMIT 5 OFFSET 10\'' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
+
+# 
+# Соединения (`join` запроса) превращаются в `JOIN` по данным из `Aion::Aya::Query::Join`: из `model` и её `ref`-поля `field` получается результирующая модель (через `Model->get_ref`), по ней — таблица и колонка первичного ключа.
+# 
+
+package Storage::Book::SqlJoin {
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
+
+	presents 'books';
+
+	has id   => (is => 'ro', isa => Int, pk => 1, col => 1);
+	has user => (is => 'ro', isa => Object['Storage::User::SqlJoin'], ref => 1);
+}
+
+package Storage::User::SqlJoin {
+	use Aion with => 'Aion::Aya';
+	use Aion::Types;
+
+	presents 'users';
+
+	has id => (is => 'ro', isa => Int, pk => 1, col => 1);
+}
+
+use aliased 'Aion::Aya::Query::Join' => 'xJoin';
+
+my $t = TransformSQL->new;
+my $query = Query->new(
+	from => 'Storage::Book::SqlJoin',
+	join => [xJoin->new(join => 'left', model => 'Storage::Book::SqlJoin', field => 'user', from_alias => 'S', to_alias => 'u')],
+);
+
+local ($::_g0 = do {$t->_select($query)}, $::_e0 = do {"\nLEFT JOIN users u ON u.id = S.user_id"}); ::ok defined($::_g0) == defined($::_e0) && $::_g0 eq $::_e0, '$t->_select($query) # -> "\nLEFT JOIN users u ON u.id = S.user_id"' or ::diag ::_struct_diff($::_g0, $::_e0); undef $::_g0; undef $::_e0;
 
 # 
 # ## expr ($expr)
@@ -176,10 +209,9 @@ local ($::_g0 = do {$t->quoteword('books')}, $::_e0 = do {'`books`'}); ::ok defi
 # 
 # Библиотека в разработке, и у диалекта SQL сейчас есть ограничения:
 # 
-# * **Конструктор не создаётся.** `TransformSQL->new` падает с `Signature mismatch`: `transform` в `SQL` объявлен как `:Isa(Me => Query => Str)`, а контракт `Abstract` требует `Any`. Пока это не исправят, в примерах объект создаётся через `bless`, а `transform` вызвать нельзя.
-# * **`transform` требует `Abstract`-объект.** Даже при `bless` вызов `transform` проверяет первый аргумент по типу из `Abstract` (`Object['Query']`) и падает, если `Query` не разрешается в класс. Поэтому в примерах показаны `sql_*` и `expr` напрямую.
-# * **`join` должен быть хешем для `_select`.** `_select` делает `%{$query->{join}}`, а `Aion::Aya::Query` хранит `join` как массив, так что `sql_select` без правки `$query->{join} = {}` падает на `Not a HASH reference`.
-# * **`insert` различает формы `join`.** `sql_insert` проверяет `@{$query->{join}}` (массив) для выбора `INSERT ... SELECT`, а затем вызывает `_select`, где `join` нужен хешем.
+# * **Конструктор не создаётся.** `TransformSQL->new` падает с `Signature mismatch`: `transform` в `SQL` объявлен как `:Isa(Me => Query => Str)`, а контракт `Abstract` требует `Any`. Пока это не исправят, объект создаётся через `bless`.
+# * **`transform` требует `Abstract`-объект.** Даже при `bless` вызов `transform` проверяет первый аргумент по типу из `Abstract` (`Object['Query']`) и падает, если `Query` не разрешается в класс. Поэтому в примерах показаны `sql_*` и `_select` напрямую.
+# * **`join` в `Query` — массив `Aion::Aya::Query::Join`.** Сам `Join` хранит только данные (тип, модель-источник, поле, алиасы), `JOIN ... ON ...` собирает только диалект, поэтому не-SQL трансформер напишет его иначе.
 # * **`filter`/`having` в `_select` проверяются на истинность.** У `Aion::Aya::Query::Expr::Op` есть перегрузка `&{}` без `bool`, поэтому выражение в `filter` даёт `Operation "bool": no method found`.
 # * **`ORDER BY` собирается из пар.** `Aion::Aya::Query` хранит `order_by` как пары «выражение — `ASC`/`DESC`», а `_select` склеивает их через `pairmap` с разделителем `' '`, поэтому в SQL попадает лишний разделитель.
 # 
