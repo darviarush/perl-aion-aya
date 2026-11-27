@@ -1,0 +1,115 @@
+msgid "Aion::Aya::Types - типы для колонок базы (целые по ширине, деньги, строки, блобы, сущности)"
+msgstr "Aion::Aya::Types - types for base columns (width integers, money, strings, blobs, entities)"
+
+msgid "`Aion::Aya::Types` — набор подтипов для описания колонок таблиц в духе типов MySQL. Модуль делает две вещи:"
+msgstr "`Aion::Aya::Types` - a set of subtypes for describing table columns in the spirit of MySQL types. The module does two things:"
+
+msgid "1. **Переэкспортирует типы.** `@EXPORT` собирается из функций `Aion::Aya::Types` (заодно подтягиваются и базовые типы `Aion::Types`), поэтому после `use Aion::Aya::Types` все они доступны в вызывающем пакете по короткому имени: `TinyNat`, `Money`, `TinyText` и т. д.\n"
+"2. **Объявляет свои подтипы** через `subtype` из `Aion::Types`."
+msgstr "1. **Re-exports types.** `@EXPORT` is assembled from the `Aion::Aya::Types` functions (at the same time the base types `Aion::Types` are also pulled up), so after `use Aion::Aya::Types` they are all available in the calling package by a short name: `TinyNat`, `Money`, `TinyText`, etc.\n"
+"2. **Declares its subtypes** using `subtype` from `Aion::Types`."
+
+msgid "Базой для «целых» служат `Bytes[n]` и `PositiveBytes[n]`: это диапазоны в `n` байт. `PositiveBytes[n]` покрывает `0..2^(8n)-1`, `Bytes[n]` — знаковый `-2^(8n-1)..2^(8n-1)-1`."
+msgstr "The base for \"integers\" is `Bytes[n]` and `PositiveBytes[n]`: these are ranges of `n` bytes. `PositiveBytes[n]` covers `0..2^(8n)-1`, `Bytes[n]` covers signed `-2^(8n-1)..2^(8n-1)-1`."
+
+msgid "Проверка — это стандартная `~~`: `VALUE ~~ Тип` даёт `1`, если значение подходит, и `''`, если нет. Тип-функцию передают без скобок; параметризованные — `Char[4]`, `Decimal[10,2]`."
+msgstr "The check is the standard `~~`: `VALUE ~~ Type` gives `1` if the value matches, and `''` if it doesn't. The type function is passed without parentheses; parameterized - `Char[4]`, `Decimal[10,2]`."
+
+msgid "Беззнаковое целое в 1 байт: `0..255`."
+msgstr "Unsigned integer of 1 byte: `0..255`."
+
+msgid "Беззнаковое целое в 2 байта: `0..65535`."
+msgstr "Unsigned integer of 2 bytes: `0..65535`."
+
+msgid "Беззнаковое целое в 3 байта: `0..16777215`."
+msgstr "Unsigned integer of 3 bytes: `0..16777215`."
+
+msgid "Беззнаковое целое в 4 байта: `0..4294967295`."
+msgstr "Unsigned 4-byte integer: `0..4294967295`."
+
+msgid "Беззнаковое целое в 8 байт: `0..2^64-1`."
+msgstr "Unsigned integer of 8 bytes: `0..2^64-1`."
+
+msgid "Знаковое целое в 1 байт: `-128..127`."
+msgstr "Signed integer of 1 byte: `-128..127`."
+
+msgid "Знаковое целое в 2 байта: `-32768..32767`."
+msgstr "Signed integer of 2 bytes: `-32768..32767`."
+
+msgid "Знаковое целое в 3 байта: `-8388608..8388607`."
+msgstr "Signed integer of 3 bytes: `-8388608..8388607`."
+
+msgid "Знаковое целое в 4 байта: `-2147483648..2147483647`."
+msgstr "Signed integer of 4 bytes: `-2147483648..2147483647`."
+
+msgid "Знаковое целое в 8 байт."
+msgstr "Signed integer of 8 bytes."
+
+msgid "Неотрицательное целое в 1 байт: `Nat & PositiveBytes[1]`, то есть `0..255`."
+msgstr "Non-negative integer of 1 byte: `Nat & PositiveBytes[1]`, that is `0..255`."
+
+msgid "Денежное значение: `Range[-92233720368547758.08, +92233720368547758.07]`."
+msgstr "Monetary value: `Range[-92233720368547758.08, +92233720368547758.07]`."
+
+msgid "Число с не более чем `A - B` цифрами до точки и дробной частью."
+msgstr "A number with no more than `A - B` digits before the dot and a fractional part."
+
+msgid "Двоичная строка длины не более `A` байт."
+msgstr "A binary string of length no more than `A` bytes."
+
+msgid "Двоичная строка переменной длины не более `A` байт: `Bin & Len[A]`."
+msgstr "Variable-length binary string no more than `A` bytes: `Bin & Len[A]`."
+
+msgid "Unicode-строка длины не более `A` символов: `Uni & Len[A]`."
+msgstr "Unicode string of length no more than `A` characters: `Uni & Len[A]`."
+
+msgid "Unicode-строка переменной длины не более `A` символов: `Uni & Len[A]`."
+msgstr "Variable-length Unicode string of no more than `A` characters: `Uni & Len[A]`."
+
+msgid "Unicode-строка до 255 символов: `Uni & Len[255]`."
+msgstr "Unicode string up to 255 characters: `Uni & Len[255]`."
+
+msgid "Unicode-строка до 65535 символов: `Uni & Len[65_535]`."
+msgstr "Unicode string up to 65535 characters: `Uni & Len[65_535]`."
+
+msgid "Unicode-строка до 16777215 символов: `Uni & Len[16_777_215]`."
+msgstr "Unicode string up to 16777215 characters: `Uni & Len[16_777_215]`."
+
+msgid "Unicode-строка до 4294967295 символов: `Uni & Len[4_294_967_295]`."
+msgstr "Unicode string up to 4294967295 characters: `Uni & Len[4_294_967_295]`."
+
+msgid "Бинарные данные до 255 байт: `Bin & Len[255]`."
+msgstr "Binary data up to 255 bytes: `Bin & Len[255]`."
+
+msgid "Бинарные данные до 65535 байт: `Bin & Len[65_535]`."
+msgstr "Binary data up to 65535 bytes: `Bin & Len[65_535]`."
+
+msgid "Бинарные данные до 16777215 байт: `Bin & Len[16_777_215]`."
+msgstr "Binary data up to 16777215 bytes: `Bin & Len[16_777_215]`."
+
+msgid "Бинарные данные до 4294967295 байт: `Bin & Len[4_294_967_295]`."
+msgstr "Binary data up to 4294967295 bytes: `Bin & Len[4_294_967_295]`."
+
+msgid "Тип-сущность: `Object[class]`, который умеет приводиться из строки-идентификатора через `coerce`. Для `Str` он берёт `Appearance` (по умолчанию `Aion::Aya::Appearance`), находит первичный ключ модели и ищет объект по нему; если не нашёл — оставляет строку как есть."
+msgstr "Entity type: `Object[class]`, which can be cast from an identifier string via `coerce`. For `Str`, it takes `Appearance` (by default `Aion::Aya::Appearance`), finds the model's primary key and searches for the object using it; if not found, leaves the line as is."
+
+msgid "Используется в `has … isa => Entity[...]`, чтобы можно было передать id вместо объекта. Пример здесь не приводится: конструктору нужен рабочий `Aion::Aya::Appearance` с базой, а библиотека ещё не дописана."
+msgstr "Used in `has ... isa => Entity[...]` so that an id can be passed instead of an object. An example is not given here: the constructor needs a working `Aion::Aya::Appearance` with a base, and the library has not yet been completed."
+
+msgid "* **`Entity` требует рабочего `Appearance`.** Приведение `Str → объект` идёт через `Aion->pleroma->resolve('Aion::Aya::Appearance')` и `QueryBuilder`, поэтому в отрыве от базы/`Appearance` тип не работает."
+msgstr "* **`Entity` requires a working `Appearance`.** Casting `Str → object` goes through `Aion->pleroma->resolve('Aion::Aya::Appearance')` and `QueryBuilder`, so the type does not work in isolation from the base/`Appearance`."
+
+msgid "В объявлении `subtype \"Имя[A, b]\", …` имена параметров имеют значение:"
+msgstr "In the `subtype \"Name[A, b]\", ...` declaration, the parameter names have the meaning:"
+
+msgid "* **Одна заглавная буква** (`A`, `B`, …) — параметр является объектом `Aion::Type` (самим типом), а не значением. С ним работают как с типом: `A->test`, `A->include($val)`.\n"
+"* **Строчные имена** (`n`, `from`, `to`, `a`, `b`) — обычные значения, с ними можно делать арифметику и подставлять их в строки/regexp."
+msgstr "* **One capital letter** (`A`, `B`, ...) - the parameter is an `Aion::Type` object (the type itself), not a value. They work with it as with a type: `A->test`, `A->include($val)`.\n"
+"* **String names** (`n`, `from`, `to`, `a`, `b`) are ordinary values, you can do arithmetic with them and substitute them into strings/regexp."
+
+msgid "⚖ **Perl5**"
+msgstr "⚖ **Perl5**"
+
+msgid "The Aion::Aya::Types module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+msgstr "The Aion::Aya::Types module is copyright © 2026 Yaroslav O. Kosmina. Rusland. All rights reserved."
+
